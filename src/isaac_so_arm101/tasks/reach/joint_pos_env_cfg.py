@@ -84,7 +84,8 @@ class SoArm101ReachEnvCfg(ReachEnvCfg):
         self.actions.arm_action = mdp.JointPositionActionCfg(
             asset_name="robot",
             joint_names=["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"],
-            scale=0.5,
+            # scale=0.5,
+            scale = 1.0,
             use_default_offset=True,
         )
         # override command generator body

@@ -60,7 +60,16 @@ uv run play --task SO-ARM100-Reach-Play-v0
 
 ## Sim2Real Transfer
 
-_Work in progress._
+The reach sim2real setup uses action-space randomization to improve transfer.
+
+Two modes are available for comparison:
+
+- Gaussian action noise: independent step-to-step perturbations for a simple baseline.
+- Pink action noise: correlated, low-frequency perturbations that are smoother and often closer to real actuator drift.
+
+In this repository, pink noise is injected by the environment during training, while inference/play configs disable it so deployment stays deterministic.
+
+For the full implementation details, see [SIM2REAL_REACH_IMPLEMENTATION.md](SIM2REAL_REACH_IMPLEMENTATION.md).
 
 ## Results
 

@@ -14,6 +14,8 @@ import isaaclab.sim as sim_utils
 
 # import mdp
 import isaaclab_tasks.manager_based.manipulation.reach.mdp as mdp
+from isaac_so_arm101.tasks.reach.mdp import sim2real_observations
+from isaac_so_arm101.tasks.reach.mdp import sim2real_randomization
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import ActionTermCfg as ActionTerm
@@ -78,6 +80,9 @@ class CommandsCfg:
         resampling_time_range=(5.0, 5.0),
         debug_vis=True,
         ranges=mdp.UniformPoseCommandCfg.Ranges(
+            # pos_x=(-0.1, 0.3),
+            # pos_y=(-0.2, 0.2),
+            # pos_z=(0.1, 0.3),
             pos_x=(-0.1, 0.1),
             pos_y=(-0.25, -0.1),
             pos_z=(0.1, 0.3),
@@ -114,8 +119,59 @@ class ObservationsCfg:
             self.enable_corruption = True
             self.concatenate_terms = True
 
+    @configclass
+    class Sim2RealPolicyCfg(ObsGroup):
+        """
+        Observations for sim2real policy (17D).
+        
+        Based on techniques from: https://qiita.com/takahasr_rs/items/ce085a2b898218f9be41
+        
+        This reduced observation set focuses on task-relevant information:
+        - joint_pos_normalized (6D)
+        - target_delta (3D) - goal error  
+        - wrist_state (1D)
+        - jaw_state (1D)
+        - previous_action (6D)
+        
+        Total: 17 dimensions
+        
+        Key benefits:
+        - Avoids noisy joint velocity signals that don't transfer to real robot
+        - Uses goal error instead of absolute EE position for fixed target tasks
+        - More robust to sensor variations and real-world noise
+        """
+        # Normalized joint positions (6D) - scaled to [-1, 1]
+        joint_pos_normalized = ObsTerm(
+            func=sim2real_observations.joint_pos_normalized,
+        )
+        
+        # Goal reach error (3D) - delta from current EE to target
+        goal_reach_error = ObsTerm(
+            func=sim2real_observations.goal_reach_error,
+            params={
+                "command_name": "ee_pose",
+                "asset_cfg": SceneEntityCfg("robot", body_names=["gripper_link"]),
+            },
+        )
+        
+        # Wrist roll state (1D)
+        wrist_state = ObsTerm(func=sim2real_observations.wrist_state)
+        
+        # Jaw/gripper state (1D)
+        jaw_state = ObsTerm(func=sim2real_observations.jaw_state)
+        
+        # Previous action (6D) - for policy stability
+        actions = ObsTerm(func=sim2real_observations.previous_action)
+
+        def __post_init__(self):
+            self.enable_corruption = False  # No corruption for sim2real
+            self.concatenate_terms = True
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+    
+    # Optional: Add sim2real policy as a separate group for comparison
+    # Can be switched via configuration
 
 
 @configclass
@@ -123,13 +179,55 @@ class EventCfg:
     """Configuration for events."""
 
     reset_robot_joints = EventTerm(
-        func=mdp.reset_joints_by_scale,
+        func=mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "position_range": (0.5, 1.5),
+            "position_range": (-0.5, 0.5),
             "velocity_range": (0.0, 0.0),
         },
     )
+    
+    randomize_robot_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "mass_distribution_params": (0.7, 1.3),
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    reset_action_pink_noise = EventTerm(
+        func=sim2real_randomization.reset_pink_noise_state,
+        mode="reset",
+    )
+    reset_action_pink_noise.enable = False
+
+
+    action_gaussian_noise = EventTerm(
+        func=sim2real_randomization.randomize_action_noise,
+        mode="before_step",
+        params={
+            "std": 0.03,
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+    action_gaussian_noise.enable = False
+
+    action_pink_noise = EventTerm(
+        func=sim2real_randomization.randomize_action_pink_noise,
+        mode="before_step",
+        params={
+            "std": 0.03,
+            "num_scales": 4,
+            "alpha_min": 0.75,
+            "alpha_max": 0.98,
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+    action_pink_noise.enable = False
+
 
 
 @configclass
@@ -205,6 +303,17 @@ class ReachEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self):
         """Post initialization."""
+        import copy
+        # Deepcopy config class attributes to prevent config leakage across tasks
+        self.scene = copy.deepcopy(self.scene)
+        self.observations = copy.deepcopy(self.observations)
+        self.actions = copy.deepcopy(self.actions)
+        self.commands = copy.deepcopy(self.commands)
+        self.rewards = copy.deepcopy(self.rewards)
+        self.terminations = copy.deepcopy(self.terminations)
+        self.events = copy.deepcopy(self.events)
+        self.curriculum = copy.deepcopy(self.curriculum)
+
         # general settings
         self.decimation = 2
         self.sim.render_interval = self.decimation

@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
+"""Script to play a checkpoint with a user-specified target pose."""
 
 """Launch Isaac Sim Simulator first."""
 
@@ -16,8 +16,8 @@ from isaaclab.app import AppLauncher
 import isaac_so_arm101.scripts.rsl_rl.cli_args as cli_args # isort: skip
 
 # add argparse arguments
-parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
-parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
+parser = argparse.ArgumentParser(description="Verify a trained RL agent with a custom target pose.")
+parser.add_argument("--video", action="store_true", default=False, help="Record videos during playing.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
@@ -35,7 +35,24 @@ parser.add_argument(
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
 parser.add_argument("--log_csv", action="store_true", default=False, help="Log joint position, velocity, EE position, and target position to CSV.")
-parser.add_argument("--csv_filename", type=str, default="play_log.csv", help="Filename for the logged CSV.")
+parser.add_argument("--csv_filename", type=str, default="play_custom_log.csv", help="Filename for the logged CSV.")
+
+# Custom target arguments
+parser.add_argument(
+    "--target_pos",
+    type=float,
+    nargs=3,
+    default=[0.15, 0.0, 0.2],
+    help="Target position [x, y, z] in robot base frame (meters). Default: 0.15 0.0 0.2",
+)
+parser.add_argument(
+    "--target_rpy",
+    type=float,
+    nargs=3,
+    default=[0.0, 0.0, 0.0],
+    help="Target orientation [roll, pitch, yaw] in radians. Default: 0.0 0.0 0.0",
+)
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -81,12 +98,10 @@ import isaac_so_arm101.tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-# PLACEHOLDER: Extension template (do not remove this comment)
-
 
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlBaseRunnerCfg):
-    """Play with RSL-RL agent."""
+    """Play with RSL-RL agent and custom target pose."""
     # grab task name for checkpoint path
     task_name = args_cli.task.split(":")[-1]
     train_task_name = task_name.replace("-Play", "")
@@ -95,8 +110,22 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent_cfg: RslRlBaseRunnerCfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
 
+    # Override target position/orientation ranges to be exact single values
+    if hasattr(env_cfg, "commands") and hasattr(env_cfg.commands, "ee_pose"):
+        tx, ty, tz = args_cli.target_pos
+        tr, tp, tyaw = args_cli.target_rpy
+        
+        env_cfg.commands.ee_pose.ranges.pos_x = (tx, tx)
+        env_cfg.commands.ee_pose.ranges.pos_y = (ty, ty)
+        env_cfg.commands.ee_pose.ranges.pos_z = (tz, tz)
+        env_cfg.commands.ee_pose.ranges.roll = (tr, tr)
+        env_cfg.commands.ee_pose.ranges.pitch = (tp, tp)
+        env_cfg.commands.ee_pose.ranges.yaw = (tyaw, tyaw)
+        
+        print(f"[INFO] Configured environment target position to: {args_cli.target_pos}")
+        print(f"[INFO] Configured environment target orientation (RPY) to: {args_cli.target_rpy}")
+
     # set the environment seed
-    # note: certain randomizations occur in the environment initialization so we set the seed here
     env_cfg.seed = agent_cfg.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
@@ -183,12 +212,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     policy = runner.get_inference_policy(device=env.unwrapped.device)
 
     # extract the neural network module
-    # we do this in a try-except to maintain backwards compatibility.
     try:
-        # version 2.3 onwards
         policy_nn = runner.alg.policy
     except AttributeError:
-        # version 2.2 and below
         policy_nn = runner.alg.actor_critic
 
     # extract the normalizer
@@ -257,7 +283,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     
             timestep += 1
             if args_cli.video and timestep == args_cli.video_length:
-                # Exit the play loop after recording one video
                 break
 
             # time delay for real-time evaluation

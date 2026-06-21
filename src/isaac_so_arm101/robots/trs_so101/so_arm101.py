@@ -31,6 +31,14 @@ SO_ARM101_CFG = ArticulationCfg(
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         rot=(1.0, 0.0, 0.0, 0.0),
+        # joint_pos={
+        #     "shoulder_pan": 0.0,
+        #     "shoulder_lift": -1.74532925,  # -100 deg
+        #     "elbow_flex": 1.57079633,      # 90 deg
+        #     "wrist_flex": -1.658,          # -95 deg
+        #     "wrist_roll": 0.0,
+        #     "gripper": 0.0,
+        # },
         joint_pos={
             "shoulder_pan": 0.0,
             "shoulder_lift": 0.0,

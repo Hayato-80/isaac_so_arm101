@@ -55,3 +55,212 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+# Sim2Real environment registrations for SO-ARM101 Reach task
+# Based on techniques from: https://qiita.com/takahasr_rs/items/ce085a2b898218f9be41
+# These use the sim2real_env_cfg module with domain randomization
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Medium-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-High-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_env_cfg:SoArm101ReachSim2RealEnvCfg_HIGH",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Low-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_env_cfg:SoArm101ReachSim2RealEnvCfg_LOW",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_env_cfg:SoArm101ReachSim2RealEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Medium-Gaussian-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM_GAUSSIAN",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Medium-Pink-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM_PINK",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+# Sim2Real environment registrations using sim2real_joint_pos_env_cfg module
+# Alternative registration for SO101-specific Sim2Real config
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Medium-v0-alt",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-High-v0-alt",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_HIGH",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Low-v0-alt",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_LOW",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Play-v0-alt",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Medium-Gaussian-v0-alt",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM_GAUSSIAN",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Medium-Pink-v0-alt",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM_PINK",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+# Pink noise comparison environments
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-No-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealNoNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Action-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealActionNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Obs-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealObsNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Both-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealBothNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+# Play variants for the comparison environments
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-No-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealNoNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Action-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealActionNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Obs-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealObsNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Both-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealBothNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)

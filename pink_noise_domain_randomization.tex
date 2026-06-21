@@ -1,0 +1,94 @@
+% =====================================================================
+% ピンクノイズを用いたドメインランダマイゼーション (Overleaf対応版)
+% 
+% ※ 本ファイルを論文に組み込む際は、メインファイルのプリアンブル（\begin{document}の前）に
+%    以下のパッケージが記述されていることを確認してください。
+%    \usepackage{amsmath}   % equation や 数式表現用
+%    \usepackage{amssymb}   % \mathbb 用
+%    \usepackage{bm}        % 太字ベクトル \boldsymbol もしくは \bm 用
+% =====================================================================
+
+ピンクノイズはロボットの関節角度と関節角速度に注入され，
+実機のエンコーダやセンサが示す時間的に相関したノイズを模擬する．
+実機センサの測定誤差は独立同分布ではなく，近接する時刻間で相関を持つことが経験的に知られており~\cite{pink_noise_rl}，
+白色ノイズよりもピンクノイズの方が実機のセンサ特性をより忠実に再現できる．
+
+ピンクノイズはパワースペクトル密度 $S(f)$ が周波数 $f$ に反比例する確率過程であり，
+
+\begin{equation}
+  S(f) \propto \frac{1}{f}
+\end{equation}
+
+と表される．Timmer \& Koenig~\cite{timmer1995} のアルゴリズムに基づき，
+長さ $T$ のピンクノイズ系列 $\boldsymbol{\eta} \in \mathbb{R}^{d \times T}$
+（$d$は次元数）を次の手順で生成する．
+
+\begin{enumerate}
+  \item 離散フーリエ変換の周波数ビン $f_k = k/T$（$k = 0, 1, \ldots, \lfloor T/2 \rfloor$）を計算する．
+  \item 振幅スケーリング係数を $s_k = f_k^{-1/2}$ とし，低周波カットオフ $f_{\min} = 1/T$ 以下のビンには $s_{k_{\min}}$ を代入する．
+  \item 実部・虚部それぞれを $\mathcal{N}(0, s_k^2)$ から独立に生成し，
+        DC成分およびナイキスト成分が実数となるよう修正する．
+  \item 逆フーリエ変換により時系列へ変換し，単位分散となるよう正規化する．
+\end{enumerate}
+
+生成されたピンクノイズはバッファとして保持され，エピソード終了時に
+リセット対象環境のみ新しい系列に入れ替える．
+各制御ステップでバッファから1サンプルを取り出して使用することで，
+エンドレスなピンクノイズ過程を効率的に近似する．
+
+観測空間への注入では，ステップ $t$ における観測ベクトル
+$\boldsymbol{o}_t \in \mathbb{R}^{n_{\mathrm{obs}}}$ に対して，
+
+\begin{equation}
+  \tilde{\boldsymbol{o}}_t = \boldsymbol{o}_t + \sigma_{\mathrm{obs}}\, \boldsymbol{\eta}_t^{\mathrm{obs}},
+  \label{eq:obs_noise}
+\end{equation}
+
+と表される．ここで $\boldsymbol{\eta}_t^{\mathrm{obs}} \in \mathbb{R}^{n_{\mathrm{obs}}}$ は
+単位分散のピンクノイズサンプルであり，$\sigma_{\mathrm{obs}}$ はノイズのスケールパラメータである．
+本研究では表~\ref{tab:obs}に示す観測空間のうち，
+実機センサ誤差の影響を最も受けやすい関節角度（6次元）と
+関節角速度（6次元）に対してのみピンクノイズを適用する．
+目標手先位置およびクォータニオン，前ステップのアクションについては
+ノイズを付加しない．
+
+アクション空間への注入では，ポリシーが出力するアクション
+$\boldsymbol{a}_t \in \mathbb{R}^{n_{\mathrm{act}}}$ に対して，
+
+\begin{equation}
+  \tilde{\boldsymbol{a}}_t = \mathrm{clip}\!\left(\boldsymbol{a}_t + \sigma_{\mathrm{act}}\, \boldsymbol{\eta}_t^{\mathrm{act}},\; -1,\; 1\right),
+  \label{eq:act_noise}
+\end{equation}
+
+とし，アクション空間の有効範囲 $[-1, 1]$ にクランプする．
+ここで $\boldsymbol{\eta}_t^{\mathrm{act}} \in \mathbb{R}^{n_{\mathrm{act}}}$ は
+アクション次元と同形状のピンクノイズサンプル，
+$\sigma_{\mathrm{act}}$ はアクションノイズのスケールパラメータである．
+
+観測ノイズとアクションノイズの系列はそれぞれ独立に生成される．
+各並列環境は独立したピンクノイズプロセスを持ち，
+GPU上で一括計算することで計算コストを最小化している．
+ノイズのスケールパラメータは
+$\sigma_{\mathrm{obs}} = 0.01$，
+$\sigma_{\mathrm{act}} = 0.03$
+と設定した．
+これらの値は，観測誤差がアクションに与える影響を適切に模擬しつつ，
+学習の安定性を損なわない範囲で調整されたものである．
+
+% =====================================================================
+% 参考文献（メインファイルの .bib ファイル、または \begin{thebibliography} に追加してください）
+% =====================================================================
+% @article{pink_noise_rl,
+%   title   = {Pink Noise Is All You Need: Colored Noise Exploration in Deep Reinforcement Learning},
+%   author  = {Eberhard, Onno and Hollenstein, Jakob and Pinneri, Cristina and Martius, Georg},
+%   journal = {International Conference on Learning Representations},
+%   year    = {2023},
+% }
+% @article{timmer1995,
+%   title   = {On generating power law noise},
+%   author  = {Timmer, J. and Koenig, M.},
+%   journal = {Astronomy and Astrophysics},
+%   volume  = {300},
+%   pages   = {707--710},
+%   year    = {1995},
+% }

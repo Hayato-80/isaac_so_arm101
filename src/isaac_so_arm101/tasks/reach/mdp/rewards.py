@@ -86,3 +86,59 @@ def object_ee_distance_and_lifted(
     lift_reward = object_is_lifted(env, minimal_height, object_cfg)
     # Combine rewards multiplicatively
     return reach_reward * lift_reward
+
+
+def jaw_asymmetric_penalty(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """
+    Asymmetric penalty for gripper/jaw position.
+    
+    Based on techniques from: https://qiita.com/takahasr_rs/items/ce085a2b898218f9be41
+    
+    The gripper tends to open too easily during reaching, so we apply a stronger
+    penalty for opening (large jaw values) than for closing. This encourages the
+    policy to keep the gripper closed during manipulation.
+    
+    Args:
+        env: The environment instance
+        asset_cfg: Scene entity configuration for robot
+        
+    Returns:
+        Penalty tensor (positive = penalty/cost to minimize)
+    """
+    robot = env.scene[asset_cfg.name]
+    joint_names = robot.data.joint_names
+    
+    # Find jaw/gripper joint
+    jaw_index = None
+    for i, name in enumerate(joint_names):
+        if "jaw" in name.lower():
+            jaw_index = i
+            break
+    
+    if jaw_index is None:
+        # Fallback: search for gripper
+        for i, name in enumerate(joint_names):
+            if "gripper" in name.lower():
+                jaw_index = i
+                break
+    
+    if jaw_index is None:
+        # No jaw found, return zero penalty
+        return torch.zeros(env.num_envs, device=env.device, dtype=torch.float32)
+    
+    # Get jaw position
+    jaw_pos = robot.data.joint_pos[:, jaw_index]
+    
+    # Asymmetric penalty: penalize opening more than closing
+    # Opening (large jaw values) gets higher penalty
+    # Closing (small jaw values) gets lower penalty
+    penalty = torch.where(
+        jaw_pos > 0.01,  # If jaw is trying to open
+        jaw_pos * 0.5,   # Heavy penalty for opening
+        torch.zeros_like(jaw_pos)  # No penalty for closing
+    )
+    
+    return penalty

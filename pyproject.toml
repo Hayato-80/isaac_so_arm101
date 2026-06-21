@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 train = "isaac_so_arm101.scripts.rsl_rl.train:main"
 play = "isaac_so_arm101.scripts.rsl_rl.play:main"
+play_custom = "isaac_so_arm101.scripts.rsl_rl.play_custom_target:main"
 list_envs = "isaac_so_arm101.scripts.list_envs:main"
 zero_agent = "isaac_so_arm101.scripts.zero_agent:main"
 random_agent = "isaac_so_arm101.scripts.random_agent:main"
@@ -36,3 +37,37 @@ url = "https://download.pytorch.org/whl/cu128"
 [build-system]
 requires = ["uv_build>=0.8.21,<0.9.0"]
 build-backend = "uv_build"
+
+# Isaac Lab environment registrations for sim2real environments (array format)
+[[tool.isaaclab.env_cfg_entry_point]]
+name = "SO-ARM101-Reach-Sim2Real-Medium-v0"
+cfg_path = "isaac_so_arm101.tasks.reach.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_MEDIUM"
+
+[[tool.isaaclab.env_cfg_entry_point]]
+name = "SO-ARM101-Reach-Sim2Real-High-v0"
+cfg_path = "isaac_so_arm101.tasks.reach.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_HIGH"
+
+[[tool.isaaclab.env_cfg_entry_point]]
+name = "SO-ARM101-Reach-Sim2Real-Low-v0"
+cfg_path = "isaac_so_arm101.tasks.reach.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_LOW"
+
+[[tool.isaaclab.env_cfg_entry_point]]
+name = "SO-ARM101-Reach-Sim2Real-Play-v0"
+cfg_path = "isaac_so_arm101.tasks.reach.sim2real_joint_pos_env_cfg:SoArm101ReachSim2RealEnvCfg_PLAY"
+
+# Isaac Lab agent registrations for sim2real training (array format)
+[[tool.isaaclab.agent_cfg_entry_point]]
+name = "reach_sim2real_medium_cfg_entry_point"
+agent_class = "isaac_so_arm101.tasks.reach.agents.rsl_rl_ppo_cfg:ReachPPORunnerCfg"
+
+[[tool.isaaclab.agent_cfg_entry_point]]
+name = "reach_sim2real_high_cfg_entry_point"
+agent_class = "isaac_so_arm101.tasks.reach.agents.rsl_rl_ppo_cfg:ReachPPORunnerCfg"
+
+[[tool.isaaclab.agent_cfg_entry_point]]
+name = "reach_sim2real_low_cfg_entry_point"
+agent_class = "isaac_so_arm101.tasks.reach.agents.rsl_rl_ppo_cfg:ReachPPORunnerCfg"
+
+[[tool.isaaclab.agent_cfg_entry_point]]
+name = "rsl_rl_ppo_cfg_entry_point"
+agent_class = "isaac_so_arm101.tasks.reach.agents.rsl_rl_ppo_cfg:ReachPPORunnerCfg"

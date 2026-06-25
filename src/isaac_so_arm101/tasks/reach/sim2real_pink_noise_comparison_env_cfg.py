@@ -49,8 +49,8 @@ class SoArm101ReachPinkNoiseBaseCfg(SoArm101ReachEnvCfg):
         return sim2real_randomization.PinkNoiseObservationModelCfg(
             std=0.02,
             num_scales=4,
-            alpha_min=0.5,
-            alpha_max=0.6,
+            alpha_min=0.75,
+            alpha_max=0.98,
         )
 
 

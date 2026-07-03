@@ -210,8 +210,8 @@ def randomize_action_pink_noise(
     env_ids: torch.Tensor,
     std: float = 0.05,
     num_scales: int = 4,
-    alpha_min: float = 0.75,
-    alpha_max: float = 0.98,
+    alpha_min: float = 0.35,
+    alpha_max: float = 0.5,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> None:
     """Add pink action noise to joint actions using TorchPinkNoiseProcess."""
@@ -287,5 +287,5 @@ class PinkNoiseObservationModelCfg(noise_utils.NoiseModelCfg):
 
     std: float = 0.02
     num_scales: int = 4
-    alpha_min: float = 0.75
-    alpha_max: float = 0.98
+    alpha_min: float = 0.35
+    alpha_max: float = 0.5

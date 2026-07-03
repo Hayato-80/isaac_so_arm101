@@ -55,3 +55,85 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+# Pink noise comparison environments for SO-ARM101 Lift task
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-No-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealNoNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-Action-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealActionNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-Obs-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealObsNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-Both-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealBothNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+# Play variants for the comparison environments
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-No-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealNoNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-Action-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealActionNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-Obs-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealObsNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Lift-Cube-Sim2Real-Both-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101LiftSim2RealBothNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LiftCubePPORunnerCfg",
+    },
+    disable_env_checker=True,
+)

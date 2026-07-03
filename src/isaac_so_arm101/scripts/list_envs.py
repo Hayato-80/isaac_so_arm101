@@ -51,6 +51,7 @@ def main():
             index += 1
 
     print(table)
+    return 0
 
 
 if __name__ == "__main__":

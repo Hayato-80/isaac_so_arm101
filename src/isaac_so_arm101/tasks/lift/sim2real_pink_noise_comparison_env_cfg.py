@@ -4,10 +4,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """
-SO101 Reach Task - Pink Noise Comparison Environments
+SO101 Lift Task - Pink Noise Comparison Environments
 
 This configuration file defines environments for comparing the effects of pink noise
-on sim2real transfer.
+on sim2real transfer for the lift task.
 
 Four scenarios are defined:
 1.  **No Pink Noise**: Baseline training without any pink noise.
@@ -17,10 +17,8 @@ Four scenarios are defined:
 """
 
 from isaaclab.utils import configclass
-from isaac_so_arm101.tasks.reach.joint_pos_env_cfg import SoArm101ReachEnvCfg
-from isaac_so_arm101.robots import SO_ARM101_CFG
-import isaaclab_tasks.manager_based.manipulation.reach.mdp as mdp
-from isaaclab.managers import SceneEntityCfg, ObservationTermCfg as ObsTerm
+from isaac_so_arm101.tasks.lift.joint_pos_env_cfg import SoArm101LiftCubeEnvCfg
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaac_so_arm101.tasks.reach.mdp import sim2real_randomization
 
 ##
@@ -29,28 +27,34 @@ from isaac_so_arm101.tasks.reach.mdp import sim2real_randomization
 
 
 @configclass
-class SoArm101ReachPinkNoiseBaseCfg(SoArm101ReachEnvCfg):
-    """Base configuration for the pink noise comparison environments."""
+class SoArm101LiftPinkNoiseBaseCfg(SoArm101LiftCubeEnvCfg):
+    """Base configuration for the pink noise comparison environments for Lift."""
 
     def __post_init__(self):
         super().__post_init__()
-        # Use default policy observation format (25D)
-        self.observations.policy = self.observations.PolicyCfg()
-
-        # Enable default randomizations/noise
-        self.observations.policy.enable_corruption = True
-        self.events.randomize_robot_mass.enable = True
-        # Disable all default action perturbations
-        self.events.action_gaussian_noise.enable = False
-        self.events.action_pink_noise.enable = False
-        self.events.reset_action_pink_noise.enable = False
+        
+        # Disable observation corruption by default
+        self.observations.policy.enable_corruption = False
+        
+        # Configure action pink noise event terms (disabled by default)
+        self.events.action_pink_noise = EventTerm(
+            func=sim2real_randomization.randomize_action_pink_noise,
+            mode="before_step",
+            params={"std": 0.05},
+            enable=False,
+        )
+        self.events.reset_action_pink_noise = EventTerm(
+            func=sim2real_randomization.reset_pink_noise_state,
+            mode="reset",
+            enable=False,
+        )
 
     def _make_obs_pink_noise_cfg(self):
         return sim2real_randomization.PinkNoiseObservationModelCfg(
             std=0.02,
             num_scales=4,
-            alpha_min=0.35,
-            alpha_max=0.5,
+            alpha_min=0.75,
+            alpha_max=0.98,
         )
 
 
@@ -60,12 +64,12 @@ class SoArm101ReachPinkNoiseBaseCfg(SoArm101ReachEnvCfg):
 
 
 @configclass
-class SoArm101ReachSim2RealNoNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
+class SoArm101LiftSim2RealNoNoiseCfg(SoArm101LiftPinkNoiseBaseCfg):
     """Scenario 1: No pink noise applied."""
 
     def __post_init__(self):
         super().__post_init__()
-        # All noise is disabled by default in the base class.
+        # All pink noise is disabled by default in the base class.
         pass
 
 
@@ -75,7 +79,7 @@ class SoArm101ReachSim2RealNoNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
 
 
 @configclass
-class SoArm101ReachSim2RealActionNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
+class SoArm101LiftSim2RealActionNoiseCfg(SoArm101LiftPinkNoiseBaseCfg):
     """Scenario 2: Pink noise applied to actions only."""
 
     def __post_init__(self):
@@ -83,8 +87,6 @@ class SoArm101ReachSim2RealActionNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
         # Enable pink noise on actions
         self.events.reset_action_pink_noise.enable = True
         self.events.action_pink_noise.enable = True
-        # Disable observation noise/corruption (action noise only)
-        self.observations.policy.enable_corruption = False
 
 
 ##
@@ -93,22 +95,16 @@ class SoArm101ReachSim2RealActionNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
 
 
 @configclass
-class SoArm101ReachSim2RealObsNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
+class SoArm101LiftSim2RealObsNoiseCfg(SoArm101LiftPinkNoiseBaseCfg):
     """Scenario 3: Pink noise applied to observations only."""
 
     def __post_init__(self):
         super().__post_init__()
         # Enable observation corruption
         self.observations.policy.enable_corruption = True
-        # Apply pink noise to observations (replacing Unoise)
-        self.observations.policy.joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel,
-            noise=self._make_obs_pink_noise_cfg()
-        )
-        self.observations.policy.joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel,
-            noise=self._make_obs_pink_noise_cfg()
-        )
+        # Apply pink noise to observations (joint_pos and joint_vel)
+        self.observations.policy.joint_pos.noise = self._make_obs_pink_noise_cfg()
+        self.observations.policy.joint_vel.noise = self._make_obs_pink_noise_cfg()
 
 
 ##
@@ -117,7 +113,7 @@ class SoArm101ReachSim2RealObsNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
 
 
 @configclass
-class SoArm101ReachSim2RealBothNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
+class SoArm101LiftSim2RealBothNoiseCfg(SoArm101LiftPinkNoiseBaseCfg):
     """Scenario 4: Pink noise on both actions and observations."""
 
     def __post_init__(self):
@@ -127,15 +123,9 @@ class SoArm101ReachSim2RealBothNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
         self.events.action_pink_noise.enable = True
         # Enable observation corruption
         self.observations.policy.enable_corruption = True
-        # Apply pink noise to observations (replacing Unoise)
-        self.observations.policy.joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel,
-            noise=self._make_obs_pink_noise_cfg()
-        )
-        self.observations.policy.joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel,
-            noise=self._make_obs_pink_noise_cfg()
-        )
+        # Apply pink noise to observations
+        self.observations.policy.joint_pos.noise = self._make_obs_pink_noise_cfg()
+        self.observations.policy.joint_vel.noise = self._make_obs_pink_noise_cfg()
 
 
 ##
@@ -144,24 +134,24 @@ class SoArm101ReachSim2RealBothNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
 
 
 @configclass
-class SoArm101ReachSim2RealNoNoiseCfg_PLAY(SoArm101ReachSim2RealNoNoiseCfg):
+class SoArm101LiftSim2RealNoNoiseCfg_PLAY(SoArm101LiftSim2RealNoNoiseCfg):
     """Play variant for Scenario 1."""
 
     def __post_init__(self):
         super().__post_init__()
-        self.scene.num_envs = 10
+        self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         # Disable noise/corruption for clean evaluation
         self.observations.policy.enable_corruption = False
 
 
 @configclass
-class SoArm101ReachSim2RealActionNoiseCfg_PLAY(SoArm101ReachSim2RealActionNoiseCfg):
+class SoArm101LiftSim2RealActionNoiseCfg_PLAY(SoArm101LiftSim2RealActionNoiseCfg):
     """Play variant for Scenario 2."""
 
     def __post_init__(self):
         super().__post_init__()
-        self.scene.num_envs = 10
+        self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         # Disable noise/corruption for clean evaluation
         self.observations.policy.enable_corruption = False
@@ -170,24 +160,24 @@ class SoArm101ReachSim2RealActionNoiseCfg_PLAY(SoArm101ReachSim2RealActionNoiseC
 
 
 @configclass
-class SoArm101ReachSim2RealObsNoiseCfg_PLAY(SoArm101ReachSim2RealObsNoiseCfg):
+class SoArm101LiftSim2RealObsNoiseCfg_PLAY(SoArm101LiftSim2RealObsNoiseCfg):
     """Play variant for Scenario 3."""
 
     def __post_init__(self):
         super().__post_init__()
-        self.scene.num_envs = 10
+        self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         # Disable noise/corruption for clean evaluation
         self.observations.policy.enable_corruption = False
 
 
 @configclass
-class SoArm101ReachSim2RealBothNoiseCfg_PLAY(SoArm101ReachSim2RealBothNoiseCfg):
+class SoArm101LiftSim2RealBothNoiseCfg_PLAY(SoArm101LiftSim2RealBothNoiseCfg):
     """Play variant for Scenario 4."""
 
     def __post_init__(self):
         super().__post_init__()
-        self.scene.num_envs = 10
+        self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         # Disable noise/corruption for clean evaluation
         self.observations.policy.enable_corruption = False

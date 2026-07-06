@@ -1,88 +1,235 @@
 % =====================================================================
-% ピンクノイズを用いたドメインランダマイゼーション (Overleaf対応版)
-% 
-% ※ 本ファイルを論文に組み込む際は、メインファイルのプリアンブル（\begin{document}の前）に
-%    以下のパッケージが記述されていることを確認してください。
-%    \usepackage{amsmath}   % equation や 数式表現用
-%    \usepackage{amssymb}   % \mathbb 用
-%    \usepackage{bm}        % 太字ベクトル \boldsymbol もしくは \bm 用
+% 色付きノイズによる観測空間ドメインランダマイゼーション (Overleaf対応版)
+%
+% 必要なパッケージ（メインファイルのプリアンブルに記述してください）:
+%   \usepackage{amsmath}
+%   \usepackage{amssymb}
+%   \usepackage{bm}
+%   \usepackage{booktabs}
 % =====================================================================
 
-ピンクノイズはロボットの関節角度と関節角速度に注入され，
-実機のエンコーダやセンサが示す時間的に相関したノイズを模擬する．
-実機センサの測定誤差は独立同分布ではなく，近接する時刻間で相関を持つことが経験的に知られており~\cite{pink_noise_rl}，
-白色ノイズよりもピンクノイズの方が実機のセンサ特性をより忠実に再現できる．
+\subsection{色付きノイズによる観測空間のドメインランダマイゼーション}
+\label{sec:obs_pink_noise}
 
-ピンクノイズはパワースペクトル密度 $S(f)$ が周波数 $f$ に反比例する確率過程であり，
+\subsubsection{動機}
+
+Sim-to-Real転移における主要な課題の一つは，シミュレータと実機の間に存在するセンサ特性の差異（Reality Gap）である．
+実機のエンコーダやセンサが示す測定誤差は独立同分布（i.i.d.）ではなく，
+近接する時刻間で時間的相関を持つことが経験的に知られている~\cite{eberhard2023pink}．
+例えば，サーボモータのエンコーダ誤差はモータの回転方向や速度に依存し，
+連続するステップ間で類似した偏差を示す傾向がある．
+
+従来のドメインランダマイゼーション手法では，
+各ステップで独立にサンプリングした白色ノイズ（一様ノイズまたはガウスノイズ）を観測に付加することが一般的であった．
+しかし，白色ノイズはすべての周波数成分を均等に含むため，
+実機センサが示す低周波優勢な誤差構造を再現できない．
+その結果，学習されたポリシーが実機の持続的なセンサ偏差に対してロバスト性を獲得できず，
+転移性能が低下する問題がある．
+
+本研究では，Eberhard~ら~\cite{eberhard2023pink}が提案した
+色付きノイズ（colored noise）の概念をアクション空間から観測空間へ拡張し，
+ドメインランダマイゼーションの一手法として提案する．
+具体的には，パワースペクトル密度が$S(f) \propto 1/f^{\beta}$（$\beta = 1$：ピンクノイズ）
+に従う時間相関ノイズを観測の関節角度および関節角速度に注入する．
+
+\subsubsection{観測空間の定義}
+
+本タスクにおける観測空間の構成を表~\ref{tab:obs}に示す．
+ポリシーは各ステップにおいて，ロボットの状態と目標指令を結合した
+観測ベクトル $\boldsymbol{o}_t \in \mathbb{R}^{n_\mathrm{obs}}$ を受け取り，
+関節位置指令 $\boldsymbol{a}_t \in \mathbb{R}^{n_\mathrm{act}}$ を出力する．
+
+\begin{table}[htbp]
+  \centering
+  \caption{観測空間の構成}
+  \label{tab:obs}
+  \begin{tabular}{llcc}
+    \toprule
+    観測項目 & 内容 & 次元 & ノイズ注入 \\
+    \midrule
+    関節角度 $\boldsymbol{q}_t$      & 各関節の相対角度         & 6  & \checkmark \\
+    関節角速度 $\dot{\boldsymbol{q}}_t$ & 各関節の相対角速度    & 6  & \checkmark \\
+    目標手先姿勢 $\boldsymbol{p}_t^{\mathrm{cmd}}$  & 位置 $(x,y,z)$ + クォータニオン $(q_w,q_x,q_y,q_z)$ & 7  & -- \\
+    前ステップアクション $\boldsymbol{a}_{t-1}$ & 前ステップのポリシー出力 & 6 & -- \\
+    \midrule
+    合計 & & 25 & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+ピンクノイズはロボットの内部状態に関わる関節角度（6次元）と関節角速度（6次元）の
+計12次元に対してのみ注入する．
+指令値（目標手先姿勢）はシミュレータ内部で厳密に生成されるため，
+および前ステップのアクションはポリシー自身の出力であるため，
+これらにはセンサノイズの模擬は不要である．
+
+\subsubsection{色付きノイズの定式化}
+
+色付きノイズは，パワースペクトル密度（PSD）が周波数のべき乗に従う確率過程であり，
 
 \begin{equation}
-  S(f) \propto \frac{1}{f}
+  S(f) \propto \frac{1}{f^{\beta}}
+  \label{eq:psd}
 \end{equation}
 
-と表される．Timmer \& Koenig~\cite{timmer1995} のアルゴリズムに基づき，
-長さ $T$ のピンクノイズ系列 $\boldsymbol{\eta} \in \mathbb{R}^{d \times T}$
-（$d$は次元数）を次の手順で生成する．
+と表される．ここで $\beta$ はスペクトル指数であり，
+$\beta = 0$ の場合は白色ノイズ（全周波数均等），
+$\beta = 1$ の場合はピンクノイズ（$1/f$ノイズ），
+$\beta = 2$ の場合はブラウンノイズ（赤色ノイズ）に相当する．
+
+ピンクノイズ（$\beta = 1$）は，白色ノイズと比較して低周波成分がより強調され，
+高周波成分が抑制される特性を持つ．
+このスペクトル構造は，実機センサが示す
+\textbf{ゆるやかに変動するバイアス的誤差}を自然にモデル化できる．
+
+ピンクノイズ系列の生成には，
+Timmer \& Koenig~\cite{timmer1995}によるFFTベースのアルゴリズムを用いる．
+長さ $T$ の$d$次元ピンクノイズ系列
+$\boldsymbol{\eta} \in \mathbb{R}^{d \times T}$は以下の手順で生成される．
 
 \begin{enumerate}
-  \item 離散フーリエ変換の周波数ビン $f_k = k/T$（$k = 0, 1, \ldots, \lfloor T/2 \rfloor$）を計算する．
-  \item 振幅スケーリング係数を $s_k = f_k^{-1/2}$ とし，低周波カットオフ $f_{\min} = 1/T$ 以下のビンには $s_{k_{\min}}$ を代入する．
-  \item 実部・虚部それぞれを $\mathcal{N}(0, s_k^2)$ から独立に生成し，
-        DC成分およびナイキスト成分が実数となるよう修正する．
-  \item 逆フーリエ変換により時系列へ変換し，単位分散となるよう正規化する．
+  \item 離散フーリエ変換の周波数ビン $f_k = k / T$
+        （$k = 0, 1, \ldots, \lfloor T/2 \rfloor$）を計算する．
+  \item 振幅スケーリング係数を
+        $s_k = f_k^{-\beta/2}$ とする．
+        ただし，低周波カットオフ $f_{\min} = 1/T$ 以下の周波数ビンには，
+        カットオフ点の値 $s_{k_{\min}}$ を一律に代入する．
+        これにより有限長系列における低周波発散を防止する．
+  \item フーリエ係数の実部 $\mathrm{Re}(X_k)$ および虚部 $\mathrm{Im}(X_k)$ を
+        それぞれ $\mathcal{N}(0, s_k^2)$ から独立に生成する．
+        DC成分（$k=0$）は虚部をゼロとし，
+        系列長が偶数の場合はナイキスト周波数成分も実数に制約する．
+        これらの成分は実部を $\sqrt{2}$ 倍して振幅を補正する．
+  \item 逆離散フーリエ変換（IDFT）により時間領域に変換し，
+        理論標準偏差 $\sigma_{\mathrm{th}}$ で除算することで単位分散に正規化する：
+        \begin{equation}
+          \sigma_{\mathrm{th}} = \frac{2}{T} \sqrt{\sum_{k=1}^{\lfloor T/2 \rfloor} w_k^2}
+          \label{eq:sigma_th}
+        \end{equation}
+        ここで $w_k = s_k$（$k < \lfloor T/2 \rfloor$），
+        最終ビンのみ $w_{\lfloor T/2 \rfloor} = s_{\lfloor T/2 \rfloor} \cdot (1 + (T \bmod 2)) / 2$
+        と補正する．
 \end{enumerate}
 
-生成されたピンクノイズはバッファとして保持され，エピソード終了時に
-リセット対象環境のみ新しい系列に入れ替える．
-各制御ステップでバッファから1サンプルを取り出して使用することで，
-エンドレスなピンクノイズ過程を効率的に近似する．
+\subsubsection{観測ノイズの注入モデル}
 
-観測空間への注入では，ステップ $t$ における観測ベクトル
-$\boldsymbol{o}_t \in \mathbb{R}^{n_{\mathrm{obs}}}$ に対して，
+生成された単位分散のピンクノイズを用い，
+ステップ $t$ における観測ベクトルに以下のようにノイズを注入する．
 
+関節角度に対する注入：
 \begin{equation}
-  \tilde{\boldsymbol{o}}_t = \boldsymbol{o}_t + \sigma_{\mathrm{obs}}\, \boldsymbol{\eta}_t^{\mathrm{obs}},
-  \label{eq:obs_noise}
+  \tilde{\boldsymbol{q}}_t = \boldsymbol{q}_t + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(q)}
+  \label{eq:obs_noise_pos}
 \end{equation}
 
-と表される．ここで $\boldsymbol{\eta}_t^{\mathrm{obs}} \in \mathbb{R}^{n_{\mathrm{obs}}}$ は
-単位分散のピンクノイズサンプルであり，$\sigma_{\mathrm{obs}}$ はノイズのスケールパラメータである．
-本研究では表~\ref{tab:obs}に示す観測空間のうち，
-実機センサ誤差の影響を最も受けやすい関節角度（6次元）と
-関節角速度（6次元）に対してのみピンクノイズを適用する．
-目標手先位置およびクォータニオン，前ステップのアクションについては
-ノイズを付加しない．
-
-アクション空間への注入では，ポリシーが出力するアクション
-$\boldsymbol{a}_t \in \mathbb{R}^{n_{\mathrm{act}}}$ に対して，
-
+関節角速度に対する注入：
 \begin{equation}
-  \tilde{\boldsymbol{a}}_t = \mathrm{clip}\!\left(\boldsymbol{a}_t + \sigma_{\mathrm{act}}\, \boldsymbol{\eta}_t^{\mathrm{act}},\; -1,\; 1\right),
-  \label{eq:act_noise}
+  \tilde{\dot{\boldsymbol{q}}}_t = \dot{\boldsymbol{q}}_t + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(\dot{q})}
+  \label{eq:obs_noise_vel}
 \end{equation}
 
-とし，アクション空間の有効範囲 $[-1, 1]$ にクランプする．
-ここで $\boldsymbol{\eta}_t^{\mathrm{act}} \in \mathbb{R}^{n_{\mathrm{act}}}$ は
-アクション次元と同形状のピンクノイズサンプル，
-$\sigma_{\mathrm{act}}$ はアクションノイズのスケールパラメータである．
+ここで，$\boldsymbol{\eta}_t^{(q)} \in \mathbb{R}^{6}$ と
+$\boldsymbol{\eta}_t^{(\dot{q})} \in \mathbb{R}^{6}$ は
+それぞれ関節角度用・関節角速度用の独立なピンクノイズサンプルであり，
+$\sigma_{\mathrm{obs}}$ はスケールパラメータである．
+各並列シミュレーション環境は独立したピンクノイズプロセスを保持するため，
+環境間でノイズ系列が相関することはない．
 
-観測ノイズとアクションノイズの系列はそれぞれ独立に生成される．
-各並列環境は独立したピンクノイズプロセスを持ち，
-GPU上で一括計算することで計算コストを最小化している．
-ノイズのスケールパラメータは
-$\sigma_{\mathrm{obs}} = 0.01$，
-$\sigma_{\mathrm{act}} = 0.03$
-と設定した．
-これらの値は，観測誤差がアクションに与える影響を適切に模擬しつつ，
-学習の安定性を損なわない範囲で調整されたものである．
+結果として，ポリシーに入力される観測ベクトルは
+\begin{equation}
+  \tilde{\boldsymbol{o}}_t =
+  \begin{bmatrix}
+    \tilde{\boldsymbol{q}}_t \\
+    \tilde{\dot{\boldsymbol{q}}}_t \\
+    \boldsymbol{p}_t^{\mathrm{cmd}} \\
+    \boldsymbol{a}_{t-1}
+  \end{bmatrix}
+  \in \mathbb{R}^{25}
+  \label{eq:corrupted_obs}
+\end{equation}
+となる．
+
+\subsubsection{バッファ方式によるノイズ過程の管理}
+
+ピンクノイズの生成にはFFT演算を要するため，
+各ステップでオンラインに生成するとGPU上の計算コストが増大する．
+そこで，本実装ではバッファ方式を採用する．
+
+エピソード長 $T_{\mathrm{ep}}$ に相当する長さのピンクノイズ系列を
+あらかじめ一括生成してバッファに格納し，
+各制御ステップではバッファからインデックスを1つ進めてサンプルを取り出す．
+バッファを使い切った場合，または環境がリセットされた場合に，
+該当する環境のバッファのみを新しい系列で入れ替える．
+この方式により，ノイズの時間的相関構造を維持しつつ，
+ステップごとの計算コストを $O(1)$ に抑える．
+
+\subsubsection{比較条件の設定}
+
+本研究では，色付きノイズによるドメインランダマイゼーションの効果を検証するため，
+以下の4条件を設定した（表~\ref{tab:noise_conditions}）．
+
+\begin{table}[htbp]
+  \centering
+  \caption{ノイズ注入条件の比較}
+  \label{tab:noise_conditions}
+  \begin{tabular}{lcc}
+    \toprule
+    条件名 & アクションノイズ & 観測ノイズ \\
+    \midrule
+    No-Noise（ベースライン）   & -- & -- \\
+    Action-Noise     & ピンク & -- \\
+    \textbf{Obs-Noise（提案手法）} & -- & \textbf{ピンク} \\
+    Both-Noise       & ピンク & ピンク \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Obs-Noise条件（\texttt{Isaac-SO-ARM101-Reach-Sim2Real-Obs-Noise-v0}）では，
+アクションへのノイズ注入は行わず，
+観測空間の関節角度・関節角速度にのみピンクノイズを注入する．
+これにより，アクションノイズと観測ノイズの効果を分離して評価でき，
+センサ特性の模擬が転移性能に与える寄与を独立に検証できる．
+
+全条件において，ロボットリンク質量のランダマイゼーション（$\pm 30\%$スケーリング）
+は共通で有効化されており，
+ノイズ注入の有無のみが条件間の差異となる．
+
+\subsubsection{ハイパーパラメータの設定}
+
+本実装で用いた主要なハイパーパラメータを表~\ref{tab:hyperparams}に示す．
+
+\begin{table}[htbp]
+  \centering
+  \caption{ピンクノイズのハイパーパラメータ}
+  \label{tab:hyperparams}
+  \begin{tabular}{lll}
+    \toprule
+    パラメータ & 記号 & 値 \\
+    \midrule
+    スペクトル指数 & $\beta$ & $1$（ピンクノイズ） \\
+    観測ノイズスケール & $\sigma_{\mathrm{obs}}$ & $0.02$ \\
+    アクションノイズスケール（Both-Noise条件） & $\sigma_{\mathrm{act}}$ & $0.03$ \\
+    バッファ長 & $T$ & $1000$ ステップ \\
+    低周波カットオフ & $f_{\min}$ & $1/T$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+観測ノイズスケール $\sigma_{\mathrm{obs}} = 0.02$ は，
+実機エンコーダの典型的な角度誤差（数十mrad程度）を基に設定した．
+この値は，ポリシーの学習安定性を損なわない範囲で，
+実機のセンサ特性を十分に模擬できるよう調整されたものである．
 
 % =====================================================================
-% 参考文献（メインファイルの .bib ファイル、または \begin{thebibliography} に追加してください）
+% 参考文献（.bib ファイルに追加してください）
 % =====================================================================
-% @article{pink_noise_rl,
-%   title   = {Pink Noise Is All You Need: Colored Noise Exploration in Deep Reinforcement Learning},
-%   author  = {Eberhard, Onno and Hollenstein, Jakob and Pinneri, Cristina and Martius, Georg},
-%   journal = {International Conference on Learning Representations},
-%   year    = {2023},
+% @inproceedings{eberhard2023pink,
+%   title     = {Pink Noise Is All You Need: Colored Noise Exploration in Deep Reinforcement Learning},
+%   author    = {Eberhard, Onno and Hollenstein, Jakob and Pinneri, Cristina and Martius, Georg},
+%   booktitle = {Proceedings of the Eleventh International Conference on Learning Representations (ICLR 2023)},
+%   month     = may,
+%   year      = {2023},
+%   url       = {https://openreview.net/forum?id=hQ9V5QN27eS},
 % }
 % @article{timmer1995,
 %   title   = {On generating power law noise},

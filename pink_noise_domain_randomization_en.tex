@@ -1,0 +1,193 @@
+% =====================================================================
+% Observation Space Domain Randomization using Colored Noise (Overleaf-compatible)
+%
+% Required Packages (Please add to your main document preamble):
+%   \usepackage{amsmath}
+%   \usepackage{amssymb}
+%   \usepackage{bm}
+%   \usepackage{booktabs}
+% =====================================================================
+
+\subsection{Domain Randomization in Observation Space via Colored Noise}
+\label{sec:obs_pink_noise}
+
+\subsubsection{Motivation}
+
+One of the primary challenges in Sim-to-Real transfer is the discrepancy in sensor characteristics between the simulator and the real robot (commonly referred to as the Reality Gap).
+In practice, measurement errors from encoders and sensors on real physical systems are rarely independent and identically distributed (i.i.d.); rather, they exhibit strong temporal correlations between consecutive time steps~\cite{eberhard2023pink}.
+For example, joint encoder errors on servo motors tend to depend on the motor's current rotational direction or velocity, leading to persistent, slowly-varying deviations over time.
+
+Conventional domain randomization methods typically corrupt observations by adding independent white noise (e.g., uniform or Gaussian noise) at each control step.
+However, because white noise possesses a flat power spectrum containing all frequency components equally, it fails to capture the low-frequency-dominated error structures characteristic of physical sensors.
+As a consequence, policies trained with white noise often lack robustness against persistent sensor biases when deployed on real systems, resulting in degraded Sim-to-Real performance.
+
+In this work, we extend the concept of colored noise introduced by Eberhard~et~al.~\cite{eberhard2023pink}---which was originally proposed as an action noise exploration strategy---to the observation space as a domain randomization technique.
+Specifically, we inject temporally correlated noise whose power spectral density follows a power-law relationship $S(f) \propto 1/f^{\beta}$ (with $\beta = 1$, representing pink noise) into the robot's joint positions and velocities.
+
+\subsubsection{Observation Space Definition}
+
+The structure of the observation space in this task is detailed in Table~\ref{tab:obs}.
+At each step, the policy receives a concatenated observation vector $\boldsymbol{o}_t \in \mathbb{R}^{n_\mathrm{obs}}$ representing the robot's state and task commands, and outputs joint position targets $\boldsymbol{a}_t \in \mathbb{R}^{n_\mathrm{act}}$.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Observation space configuration}
+  \label{tab:obs}
+  \begin{tabular}{llcc}
+    \toprule
+    Observation Item & Description & Dimension & Noise Injection \\
+    \midrule
+    Joint position $\boldsymbol{q}_t$      & Relative angles of each joint & 6  & \checkmark \\
+    Joint velocity $\dot{\boldsymbol{q}}_t$ & Relative angular velocities of each joint & 6  & \checkmark \\
+    Target end-effector pose $\boldsymbol{p}_t^{\mathrm{cmd}}$ & Position $(x,y,z)$ + Quaternion $(q_w,q_x,q_y,q_z)$ & 7  & -- \\
+    Previous action $\boldsymbol{a}_{t-1}$ & Policy output from the previous step & 6 & -- \\
+    \midrule
+    Total & & 25 & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+We apply pink noise only to the joint positions (6D) and joint velocities (6D), totaling 12 dimensions representing the physical state of the robot.
+We do not inject noise into the target command or the previous action, as these signals are generated cleanly within the control loop or the policy network.
+
+\subsubsection{Mathematical Formulation of Colored Noise}
+
+Colored noise refers to a stochastic process whose power spectral density (PSD), $S(f)$, scales with frequency $f$ according to:
+
+\begin{equation}
+  S(f) \propto \frac{1}{f^{\beta}}
+  \label{eq:psd}
+\end{equation}
+
+where $\beta$ denotes the spectral exponent.
+Special cases include white noise when $\beta = 0$ (equal energy across all frequencies), pink noise when $\beta = 1$ ($1/f$ noise), and brown/red noise when $\beta = 2$.
+
+Compared to white noise, pink noise ($\beta = 1$) highlights lower frequency components while dampening high-frequency oscillations.
+This spectral shape naturally models the slowly-varying bias drift and systematic measurement errors observed in real-world physical sensors.
+
+To generate the pink noise sequences, we employ the Fast Fourier Transform (FFT) based algorithm proposed by Timmer \& Koenig~\cite{timmer1995}.
+A $d$-dimensional pink noise sequence of length $T$, denoted as $\boldsymbol{\eta} \in \mathbb{R}^{d \times T}$, is generated through the following steps:
+
+\begin{enumerate}
+  \item Compute the discrete frequency bins $f_k = k / T$ for $k = 0, 1, \ldots, \lfloor T/2 \rfloor$.
+  \item Construct amplitude scaling factors $s_k = f_k^{-\beta/2}$.
+        To prevent low-frequency divergence in finite-length sequences, a low-frequency cutoff is defined at $f_{\min} = 1/T$, and the value $s_{k_{\min}}$ is assigned to all frequency bins below this threshold.
+  \item Generate the real part $\mathrm{Re}(X_k)$ and imaginary part $\mathrm{Im}(X_k)$ of the Fourier coefficients independently from $\mathcal{N}(0, s_k^2)$.
+        The imaginary component of the DC term ($k=0$) is set to zero. If the sequence length $T$ is even, the Nyquist frequency component is also constrained to be real.
+        These components are multiplied by $\sqrt{2}$ to correct their amplitudes.
+  \item Perform an Inverse Discrete Fourier Transform (IDFT) to yield the time-domain series, and normalize the output to unit variance by dividing by the theoretical standard deviation $\sigma_{\mathrm{th}}$:
+        \begin{equation}
+          \sigma_{\mathrm{th}} = \frac{2}{T} \sqrt{\sum_{k=1}^{\lfloor T/2 \rfloor} w_k^2}
+          \label{eq:sigma_th}
+        \end{equation}
+        where $w_k = s_k$ for $k < \lfloor T/2 \rfloor$, and the final bin is adjusted as $w_{\lfloor T/2 \rfloor} = s_{\lfloor T/2 \rfloor} \cdot (1 + (T \bmod 2)) / 2$.
+\end{enumerate}
+
+\subsubsection{Observation Noise Injection Model}
+
+Using the generated unit-variance pink noise process, we corrupt the joint observations at step $t$ as follows:
+
+For joint positions:
+\begin{equation{eq:obs_noise_pos}}
+  \tilde{\boldsymbol{q}}_t = \boldsymbol{q}_t + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(q)}
+\end{equation}
+
+For joint velocities:
+\begin{equation{eq:obs_noise_vel}}
+  \tilde{\dot{\boldsymbol{q}}}_t = \dot{\boldsymbol{q}}_t + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(\dot{q})}
+\end{equation}
+
+where $\boldsymbol{\eta}_t^{(q)} \in \mathbb{R}^{6}$ and $\boldsymbol{\eta}_t^{(\dot{q})} \in \mathbb{R}^{6}$ represent independent pink noise samples for position and velocity, respectively, and $\sigma_{\mathrm{obs}}$ represents the noise scaling parameter.
+Each parallel environment maintains its own independent pink noise generator, ensuring that noise sequences are uncorrelated across environments.
+
+Consequently, the policy inputs at time step $t$ are constructed as:
+\begin{equation}
+  \tilde{\boldsymbol{o}}_t =
+  \begin{bmatrix}
+    \tilde{\boldsymbol{q}}_t \\
+    \tilde{\dot{\boldsymbol{q}}}_t \\
+    \boldsymbol{p}_t^{\mathrm{cmd}} \\
+    \boldsymbol{a}_{t-1}
+  \end{bmatrix}
+  \in \mathbb{R}^{25}
+  \label{eq:corrupted_obs}
+\end{equation}
+
+\subsubsection{Buffer-based Noise Process Management}
+
+Because the FFT-based generation of pink noise is computationally expensive, generating it online at every step would severely bottleneck GPU-accelerated parallel simulation.
+To circumvent this, we implement a buffer-based approach.
+
+Prior to training, pink noise sequences spanning the maximum episode length $T_{\mathrm{ep}}$ are generated in batch and stored in memory.
+During step transitions, we index sequentially through the buffer.
+When a specific environment is reset or reaches the end of the buffer, only the noise buffer of that environment is regenerated with a new sequence.
+This design maintains the temporal correlation structure of the noise while keeping the step-wise computation cost at $O(1)$.
+
+\subsubsection{Evaluation Scenarios}
+
+To isolate and evaluate the impact of colored observation noise on Sim-to-Real policy transfer, we construct four distinct training scenarios (Table~\ref{tab:noise_conditions}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Comparison of noise injection conditions}
+  \label{tab:noise_conditions}
+  \begin{tabular}{lcc}
+    \toprule
+    Scenario Name & Action Noise & Observation Noise \\
+    \midrule
+    No-Noise (Baseline) & -- & -- \\
+    Action-Noise        & Pink & -- \\
+    \textbf{Obs-Noise (Ours)} & -- & \textbf{Pink} \\
+    Both-Noise          & Pink & Pink \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+In the Obs-Noise scenario (\texttt{Isaac-SO-ARM101-Reach-Sim2Real-Obs-Noise-v0}), action perturbations are disabled, and pink noise is injected solely into the joint positions and velocities.
+This configuration allows us to isolate the effects of sensor noise simulation from command perturbations and examine its individual contribution to transfer performance.
+
+Note that across all four conditions, robot link mass randomization ($\pm 30\%$ scaling) remains enabled as a baseline domain randomization parameter.
+
+\subsubsection{Hyperparameter Settings}
+
+The primary hyperparameters utilized in our implementation are summarized in Table~\ref{tab:hyperparams}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Pink noise hyperparameters}
+  \label{tab:hyperparams}
+  \begin{tabular}{lll}
+    \toprule
+    Parameter & Symbol & Value \\
+    \midrule
+    Spectral exponent & $\beta$ & $1$ (Pink noise) \\
+    Observation noise scale & $\sigma_{\mathrm{obs}}$ & $0.02$ \\
+    Action noise scale (for Both-Noise) & $\sigma_{\mathrm{act}}$ & $0.03$ \\
+    Buffer length & $T$ & $1000$ steps \\
+    Low-frequency cutoff & $f_{\min}$ & $1/T$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The observation noise scale $\sigma_{\mathrm{obs}} = 0.02$ was selected based on the typical error specifications (tens of milliradians) of physical servo encoders.
+This amplitude effectively models real-world sensor noise without destabilizing the policy optimization process.
+
+% =====================================================================
+% BibTeX References
+% =====================================================================
+% @inproceedings{eberhard2023pink,
+%   title     = {Pink Noise Is All You Need: Colored Noise Exploration in Deep Reinforcement Learning},
+%   author    = {Eberhard, Onno and Hollenstein, Jakob and Pinneri, Cristina and Martius, Georg},
+%   booktitle = {Proceedings of the Eleventh International Conference on Learning Representations (ICLR 2023)},
+%   month     = may,
+%   year      = {2023},
+%   url       = {https://openreview.net/forum?id=hQ9V5QN27eS},
+% }
+% @article{timmer1995,
+%   title   = {On generating power law noise},
+%   author  = {Timmer, J. and Koenig, M.},
+%   journal = {Astronomy and Astrophysics},
+%   volume  = {300},
+%   pages   = {707--710},
+%   year    = {1995},
+% }

@@ -19,6 +19,8 @@ Four scenarios are defined:
 from isaaclab.utils import configclass
 from isaac_so_arm101.tasks.lift.joint_pos_env_cfg import SoArm101LiftCubeEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import ObservationTermCfg as ObsTerm
+import isaac_so_arm101.tasks.lift.mdp as mdp
 from isaac_so_arm101.tasks.reach.mdp import sim2real_randomization
 
 ##
@@ -41,20 +43,23 @@ class SoArm101LiftPinkNoiseBaseCfg(SoArm101LiftCubeEnvCfg):
             func=sim2real_randomization.randomize_action_pink_noise,
             mode="before_step",
             params={"std": 0.05},
-            enable=False,
         )
+        self.events.action_pink_noise.enable = False
+
         self.events.reset_action_pink_noise = EventTerm(
             func=sim2real_randomization.reset_pink_noise_state,
             mode="reset",
-            enable=False,
         )
+        self.events.reset_action_pink_noise.enable = False
 
     def _make_obs_pink_noise_cfg(self):
         return sim2real_randomization.PinkNoiseObservationModelCfg(
             std=0.02,
             num_scales=4,
-            alpha_min=0.75,
-            alpha_max=0.98,
+            # alpha_min=0.75,
+            # alpha_max=0.98,
+            alpha_min=0.35,
+            alpha_max=0.5,
         )
 
 
@@ -102,9 +107,15 @@ class SoArm101LiftSim2RealObsNoiseCfg(SoArm101LiftPinkNoiseBaseCfg):
         super().__post_init__()
         # Enable observation corruption
         self.observations.policy.enable_corruption = True
-        # Apply pink noise to observations (joint_pos and joint_vel)
-        self.observations.policy.joint_pos.noise = self._make_obs_pink_noise_cfg()
-        self.observations.policy.joint_vel.noise = self._make_obs_pink_noise_cfg()
+        # Apply pink noise to observations (replacing Unoise)
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=self._make_obs_pink_noise_cfg()
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=self._make_obs_pink_noise_cfg()
+        )
 
 
 ##
@@ -123,9 +134,15 @@ class SoArm101LiftSim2RealBothNoiseCfg(SoArm101LiftPinkNoiseBaseCfg):
         self.events.action_pink_noise.enable = True
         # Enable observation corruption
         self.observations.policy.enable_corruption = True
-        # Apply pink noise to observations
-        self.observations.policy.joint_pos.noise = self._make_obs_pink_noise_cfg()
-        self.observations.policy.joint_vel.noise = self._make_obs_pink_noise_cfg()
+        # Apply pink noise to observations (replacing Unoise)
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=self._make_obs_pink_noise_cfg()
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=self._make_obs_pink_noise_cfg()
+        )
 
 
 ##

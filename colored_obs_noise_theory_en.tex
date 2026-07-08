@@ -1,0 +1,120 @@
+% =====================================================================
+% Colored Observation Noise with Randomized Spectral Exponent
+% for Sim-to-Real Domain Randomization (Overleaf-compatible)
+%
+% Required Packages:
+%   \usepackage{amsmath}
+%   \usepackage{amssymb}
+%   \usepackage{bm}
+%   \usepackage{booktabs}
+% =====================================================================
+
+\subsection{Colored Observation Noise with Randomized Spectral Exponent}
+\label{sec:colored_obs_noise}
+
+\subsubsection{Problem Statement}
+
+Domain randomization corrupts simulated observations with noise to bridge the Sim-to-Real gap.
+A common approach adds independent and identically distributed (i.i.d.)\ white noise
+$\boldsymbol{\epsilon}_t \sim \mathcal{N}(\boldsymbol{0}, \sigma^2 \boldsymbol{I})$
+at each time step $t$.
+However, real sensor errors exhibit temporal correlations:
+encoder backlash, thermal drift, and communication jitter each produce noise
+with a characteristic frequency spectrum.
+An alternative is to use \emph{pink noise} ($1/f$ noise, spectral exponent $\beta=1$)~\cite{eberhard2023pink},
+which introduces temporal correlation and better approximates real sensor behavior.
+
+A remaining limitation is that the spectral exponent is fixed to $\beta = 1$.
+In practice, different noise sources on the same robot produce different spectral shapes:
+encoder quantization errors resemble $\beta \approx 0.5$,
+servo backlash follows $\beta \approx 1.0$--$1.5$,
+and thermal drift approaches $\beta \approx 2.0$.
+A policy trained under a single fixed $\beta$ may overfit to that particular noise structure.
+
+\subsubsection{Proposed Method: Per-Episode $\beta$ Randomization}
+
+We propose randomizing the spectral exponent $\beta$ as a domain randomization parameter.
+At each episode reset, every parallel environment independently samples
+\begin{equation}
+  \beta_i \sim \mathcal{U}(\beta_{\min},\, \beta_{\max})
+  \label{eq:beta_sample}
+\end{equation}
+where $\beta_{\min}$ and $\beta_{\max}$ define the range of noise spectra encountered during training.
+A colored noise sequence with power spectral density $S(f) \propto 1/f^{\beta_i}$ is then generated
+using the Timmer--Koenig FFT algorithm~\cite{timmer1995}, with the key modification that the
+amplitude scaling in the frequency domain uses the sampled exponent:
+\begin{equation}
+  s_k = f_k^{-\beta_i / 2}
+  \label{eq:scaling}
+\end{equation}
+rather than the fixed $s_k = f_k^{-1/2}$ used in standard pink noise generation.
+
+The generated unit-variance noise is applied selectively to sensor-derived observations
+(joint positions and velocities), while command signals and previous actions remain uncorrupted:
+\begin{equation}
+  \tilde{\boldsymbol{o}}_t^{(\mathrm{sens})} = \boldsymbol{o}_t^{(\mathrm{sens})} + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(\beta_i)}
+  \label{eq:corruption}
+\end{equation}
+where $\boldsymbol{\eta}_t^{(\beta_i)}$ denotes a sample from the colored noise process
+generated with exponent $\beta_i$.
+
+\subsubsection{Training Scenarios}
+
+To evaluate the effect of $\beta$ randomization, we define the following comparison scenarios
+alongside the existing baselines:
+
+\begin{table}[htbp]
+  \centering
+  \caption{Noise injection conditions for comparative evaluation}
+  \label{tab:colored_scenarios}
+  \begin{tabular}{lccc}
+    \toprule
+    Scenario & Action Noise & Obs.\ Noise & $\beta$ \\
+    \midrule
+    No-Noise (baseline) & -- & -- & -- \\
+    Obs-Noise (pink) & -- & Pink & $1$ (fixed) \\
+    \textbf{Obs-Colored-Noise (ours)} & -- & \textbf{Colored} & $\boldsymbol{\mathcal{U}(0.5, 1.5)}$ \\
+    Both-Colored-Noise & Pink & Colored & action: $1$, obs: $\mathcal{U}(0.5, 1.5)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Hyperparameters}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Hyperparameters for colored observation noise}
+  \label{tab:colored_hyperparams}
+  \begin{tabular}{lll}
+    \toprule
+    Parameter & Symbol & Value \\
+    \midrule
+    Spectral exponent range & $[\beta_{\min},\, \beta_{\max}]$ & $[0.5,\, 1.5]$ \\
+    Observation noise scale & $\sigma_{\mathrm{obs}}$ & $0.02$ \\
+    Noise buffer length & $T$ & $1000$ steps \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The range $\beta \in [0.5, 1.5]$ spans from nearly-white noise ($\beta = 0.5$, weak correlation)
+to strongly correlated noise ($\beta = 1.5$, approaching brown noise),
+covering the diversity of real sensor characteristics.
+
+% =====================================================================
+% BibTeX References (add to your .bib file)
+% =====================================================================
+% @inproceedings{eberhard2023pink,
+%   title     = {Pink Noise Is All You Need: Colored Noise Exploration in Deep Reinforcement Learning},
+%   author    = {Eberhard, Onno and Hollenstein, Jakob and Pinneri, Cristina and Martius, Georg},
+%   booktitle = {Proceedings of the Eleventh International Conference on Learning Representations (ICLR 2023)},
+%   year      = {2023},
+%   url       = {https://openreview.net/forum?id=hQ9V5QN27eS},
+% }
+% @article{timmer1995,
+%   title   = {On generating power law noise},
+%   author  = {Timmer, J. and Koenig, M.},
+%   journal = {Astronomy and Astrophysics},
+%   volume  = {300},
+%   pages   = {707--710},
+%   year    = {1995},
+% }

@@ -100,51 +100,76 @@ def randomize_action_noise(
 
 def generate_pink_noise(size: list[int] | tuple[int, ...], device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     """Generate unit-variance pink noise using the Timmer & Koenig FFT algorithm in PyTorch."""
+    return generate_colored_noise(size, device, dtype, exponent=1.0)
+
+
+def generate_colored_noise(
+    size: list[int] | tuple[int, ...],
+    device: torch.device,
+    dtype: torch.dtype,
+    exponent: float = 1.0,
+) -> torch.Tensor:
+    """Generate unit-variance colored noise using the Timmer & Koenig FFT algorithm.
+
+    The power spectral density of the generated noise is proportional to
+    S(f) = 1 / f^exponent.  Special cases:
+      - exponent=0 : white noise
+      - exponent=1 : pink (1/f) noise
+      - exponent=2 : brown / red noise
+
+    Args:
+        size: Shape of the output. The last dimension is the time axis.
+        device: Torch device.
+        dtype: Torch dtype.
+        exponent: Spectral exponent beta >= 0.  Defaults to 1.0 (pink noise).
+
+    Returns:
+        Tensor of shape ``size`` with unit variance and PSD ~ 1/f^exponent.
+    """
     samples = size[-1]
-    
+
     # Calculate frequencies (Hermitian spectrum for real output)
     f = torch.fft.rfftfreq(samples, device=device)
-    
+
     # Low-frequency cutoff
     fmin = 1.0 / samples
-    
-    # Build scaling factors for frequencies: S(f) = 1 / f
-    # For amplitude scale, we take the square root of PSD: f^(-exponent/2) with exponent=1
+
+    # Build scaling factors: amplitude ~ f^(-exponent/2)
     s_scale = f.clone()
     cutoff_idx = torch.sum(s_scale < fmin).item()
     if cutoff_idx > 0 and cutoff_idx < len(s_scale):
         s_scale[:cutoff_idx] = s_scale[cutoff_idx]
-    s_scale = s_scale ** -0.5
-    
+    s_scale = s_scale ** (-exponent / 2.0)
+
     # Calculate theoretical output standard deviation from scaling
     w = s_scale[1:].clone()
     w[-1] *= (1 + (samples % 2)) / 2.0
     sigma = 2.0 * torch.sqrt(torch.sum(w ** 2)) / samples
-    
+
     # Adjust size to generate one complex Fourier component per frequency
     noise_size = list(size)
     noise_size[-1] = len(f)
-    
+
     # Generate scaled random power + phase
     s_scale_broadcast = s_scale.view(*([1] * (len(size) - 1)), -1)
     sr = torch.randn(noise_size, device=device, dtype=dtype) * s_scale_broadcast
     si = torch.randn(noise_size, device=device, dtype=dtype) * s_scale_broadcast
-    
+
     # If the signal length is even, Nyquist frequency coefficient must be real
     if not (samples % 2):
         si[..., -1] = 0.0
         sr[..., -1] *= 1.4142135623730951  # sqrt(2) to fix magnitude
-        
+
     # DC component must be real
     si[..., 0] = 0.0
     sr[..., 0] *= 1.4142135623730951  # sqrt(2) to fix magnitude
-    
+
     # Combine power + phase to complex Fourier components
     s = torch.complex(sr, si)
-    
+
     # Transform to real time series & scale to unit variance
     y = torch.fft.irfft(s, n=samples, dim=-1) / sigma
-    
+
     return y
 
 
@@ -174,6 +199,79 @@ class TorchPinkNoiseProcess:
         
         new_noise = generate_pink_noise(sub_size, self.device, self.dtype)
         self.buffer[env_ids] = new_noise
+
+    def sample(self, T: int = 1) -> torch.Tensor:
+        n = 0
+        ret = []
+        while n < T:
+            if self.idx >= self.time_steps:
+                self.reset()
+            m = min(T - n, self.time_steps - self.idx)
+            ret.append(self.buffer[..., self.idx : (self.idx + m)])
+            n += m
+            self.idx += m
+
+        ret = torch.cat(ret, dim=-1)
+        if T == 1:
+            ret = ret.squeeze(-1)
+        return self.scale * ret
+
+
+class TorchColoredNoiseProcess:
+    """Vectorized Colored Noise Process with per-environment beta randomization.
+
+    Unlike ``TorchPinkNoiseProcess`` which always uses beta=1, this class
+    samples a random spectral exponent beta ~ Uniform(beta_min, beta_max)
+    independently for each parallel environment every time that environment
+    is reset.  This forces the policy to handle a variety of noise spectra
+    during training, improving robustness to unknown real-world sensor
+    characteristics.
+    """
+
+    def __init__(
+        self,
+        size: tuple[int, ...],
+        device: torch.device,
+        dtype: torch.dtype,
+        scale: float = 1.0,
+        beta_min: float = 0.5,
+        beta_max: float = 1.5,
+    ):
+        self.size = list(size)
+        self.device = device
+        self.dtype = dtype
+        self.scale = scale
+        self.beta_min = beta_min
+        self.beta_max = beta_max
+        self.time_steps = self.size[-1]
+        self.buffer = None
+        self.idx = 0
+        self.reset()
+
+    def reset(self):
+        """Regenerate noise for ALL environments with random beta per env."""
+        num_envs = self.size[0]
+        obs_dim = self.size[1]
+        seq_len = self.size[2] if len(self.size) > 2 else self.size[-1]
+        slices = []
+        for _ in range(num_envs):
+            beta = torch.empty(1).uniform_(self.beta_min, self.beta_max).item()
+            single_size = [1, obs_dim, seq_len] if len(self.size) > 2 else [obs_dim, seq_len]
+            slices.append(generate_colored_noise(single_size, self.device, self.dtype, exponent=beta))
+        self.buffer = torch.cat(slices, dim=0)
+        self.idx = 0
+
+    def reset_env_ids(self, env_ids: torch.Tensor):
+        """Regenerate noise for specific environments with fresh random beta."""
+        if env_ids.numel() == 0:
+            return
+        obs_dim = self.size[1]
+        seq_len = self.size[2] if len(self.size) > 2 else self.size[-1]
+        for i in env_ids:
+            beta = torch.empty(1).uniform_(self.beta_min, self.beta_max).item()
+            single_size = [1, obs_dim, seq_len] if len(self.size) > 2 else [obs_dim, seq_len]
+            new_noise = generate_colored_noise(single_size, self.device, self.dtype, exponent=beta)
+            self.buffer[i] = new_noise.squeeze(0) if len(self.size) > 2 else new_noise
 
     def sample(self, T: int = 1) -> torch.Tensor:
         n = 0
@@ -289,3 +387,69 @@ class PinkNoiseObservationModelCfg(noise_utils.NoiseModelCfg):
     num_scales: int = 4
     alpha_min: float = 0.35
     alpha_max: float = 0.5
+
+
+class ColoredNoiseObservationModel(noise_utils.NoiseModel):
+    """Colored noise observation model with per-environment beta randomization.
+
+    Each environment draws a random spectral exponent beta ~ U(beta_min, beta_max)
+    at every episode reset, producing noise with diverse spectral characteristics.
+    This extends ``PinkNoiseObservationModel`` (fixed beta=1) to a distribution
+    over noise spectra for stronger domain randomization.
+    """
+
+    def __init__(self, noise_model_cfg: "ColoredNoiseObservationModelCfg", num_envs: int, device: str):
+        super().__init__(noise_model_cfg, num_envs, device)
+        self._std = noise_model_cfg.std
+        self._beta_min = noise_model_cfg.beta_min
+        self._beta_max = noise_model_cfg.beta_max
+        self._process: TorchColoredNoiseProcess | None = None
+
+    def reset(self, env_ids=None):
+        if self._process is None:
+            return
+        if env_ids is None:
+            self._process.reset()
+        else:
+            self._process.reset_env_ids(env_ids)
+
+    def __call__(self, data: torch.Tensor) -> torch.Tensor:
+        obs_dim = data.shape[1] if data.dim() > 1 else 1
+        if self._process is None or self._process.size[0] != data.shape[0] or self._process.size[1] != obs_dim:
+            self._process = TorchColoredNoiseProcess(
+                size=(data.shape[0], obs_dim, 1000),
+                device=data.device,
+                dtype=data.dtype,
+                scale=self._std,
+                beta_min=self._beta_min,
+                beta_max=self._beta_max,
+            )
+
+        # Sample 1 step of noise
+        noise_torch = self._process.sample(T=1)
+
+        if data.dim() == 1:
+            noise_torch = noise_torch.squeeze(-1)
+
+        return data + noise_torch
+
+
+@configclass
+class ColoredNoiseObservationModelCfg(noise_utils.NoiseModelCfg):
+    """Configuration for colored noise observation model with beta randomization.
+
+    At each episode reset, each environment samples a spectral exponent
+    beta ~ U(beta_min, beta_max) to produce noise with PSD ~ 1/f^beta.
+
+    Attributes:
+        std: Noise scale (standard deviation multiplier).
+        beta_min: Lower bound of the spectral exponent range.
+        beta_max: Upper bound of the spectral exponent range.
+    """
+
+    class_type: type = ColoredNoiseObservationModel
+    noise_cfg: noise_utils.NoiseCfg = noise_utils.ConstantNoiseCfg(bias=0.0)
+
+    std: float = 0.02
+    beta_min: float = 0.5
+    beta_max: float = 1.5

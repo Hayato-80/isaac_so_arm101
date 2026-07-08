@@ -193,3 +193,106 @@ class SoArm101ReachSim2RealBothNoiseCfg_PLAY(SoArm101ReachSim2RealBothNoiseCfg):
         self.observations.policy.enable_corruption = False
         self.events.action_pink_noise.enable = False
         self.events.reset_action_pink_noise.enable = False
+
+
+##
+# 5. Colored Noise on Observations Only (beta randomized per episode)
+##
+
+
+@configclass
+class SoArm101ReachSim2RealObsColoredNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario 5: Colored noise (randomized beta) applied to observations only.
+
+    Each environment samples beta ~ U(beta_min, beta_max) at every episode reset.
+    This provides a richer distribution of noise spectra than fixed pink noise (beta=1),
+    improving policy robustness to unknown real-world sensor characteristics.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        # Enable observation corruption
+        self.observations.policy.enable_corruption = True
+        # Apply colored noise with randomized beta to observations
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=0.5,
+            beta_max=1.5,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=0.5,
+                beta_max=1.5,
+            ),
+        )
+
+
+##
+# 6. Colored Noise on Both Actions and Observations
+##
+
+
+@configclass
+class SoArm101ReachSim2RealBothColoredNoiseCfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario 6: Colored noise (randomized beta) on both actions and observations."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        # Enable pink noise on actions (action noise keeps fixed beta=1)
+        self.events.reset_action_pink_noise.enable = True
+        self.events.action_pink_noise.enable = True
+        # Enable colored observation noise with randomized beta
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=0.5,
+            beta_max=1.5,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=0.5,
+                beta_max=1.5,
+            ),
+        )
+
+
+##
+# PLAY variants for new colored noise scenarios
+##
+
+
+@configclass
+class SoArm101ReachSim2RealObsColoredNoiseCfg_PLAY(SoArm101ReachSim2RealObsColoredNoiseCfg):
+    """Play variant for Scenario 5."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class SoArm101ReachSim2RealBothColoredNoiseCfg_PLAY(SoArm101ReachSim2RealBothColoredNoiseCfg):
+    """Play variant for Scenario 6."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+        self.events.action_pink_noise.enable = False
+        self.events.reset_action_pink_noise.enable = False
+

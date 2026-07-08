@@ -1,0 +1,126 @@
+% =====================================================================
+% スペクトル指数ランダマイゼーションによる色付き観測ノイズ
+% Sim-to-Realドメインランダマイゼーション (Overleaf対応版)
+%
+% 必要なパッケージ:
+%   \usepackage{amsmath}
+%   \usepackage{amssymb}
+%   \usepackage{bm}
+%   \usepackage{booktabs}
+% =====================================================================
+
+\subsection{スペクトル指数ランダマイゼーションによる色付き観測ノイズ}
+\label{sec:colored_obs_noise}
+
+\subsubsection{問題設定}
+
+ドメインランダマイゼーションでは，Sim-to-Realギャップを埋めるために
+シミュレーション上の観測にノイズを付加する手法が広く用いられている．
+従来は，各ステップで独立同分布（i.i.d.）の白色ノイズ
+$\boldsymbol{\epsilon}_t \sim \mathcal{N}(\boldsymbol{0}, \sigma^2 \boldsymbol{I})$
+を付加することが一般的であった．
+しかし，実機のセンサ誤差には時間的相関が存在する．
+エンコーダのバックラッシュ，サーモドリフト，通信ジッタは
+それぞれ固有の周波数スペクトルを持つノイズを発生させる．
+この課題に対し，時間相関を持つピンクノイズ（$1/f$ノイズ，スペクトル指数$\beta=1$）を
+用いる手法が提案されている~\cite{eberhard2023pink}．
+
+しかし，既存手法ではスペクトル指数が$\beta = 1$に固定されている点に限界がある．
+実際のロボットでは，異なるノイズ源が異なるスペクトル構造を示す：
+エンコーダの量子化誤差は$\beta \approx 0.5$，
+サーボのバックラッシュは$\beta \approx 1.0$--$1.5$，
+サーモドリフトは$\beta \approx 2.0$に近い特性を持つ．
+単一の固定$\beta$で学習されたポリシーは，
+その特定のノイズ構造に過適合するリスクがある．
+
+\subsubsection{提案手法：エピソードごとの$\beta$ランダマイゼーション}
+
+本研究では，スペクトル指数$\beta$をドメインランダマイゼーションのパラメータとして
+ランダマイズすることを提案する．
+各エピソードのリセット時に，各並列シミュレーション環境が独立に
+\begin{equation}
+  \beta_i \sim \mathcal{U}(\beta_{\min},\, \beta_{\max})
+  \label{eq:beta_sample}
+\end{equation}
+をサンプリングする．
+ここで$\beta_{\min}$と$\beta_{\max}$は，学習時に経験するノイズスペクトルの範囲を定義する．
+サンプリングされた$\beta_i$に基づき，パワースペクトル密度
+$S(f) \propto 1/f^{\beta_i}$に従う色付きノイズ系列を
+Timmer--Koenig FFTアルゴリズム~\cite{timmer1995}で生成する．
+従来のピンクノイズ生成との差異は，
+周波数領域における振幅スケーリングがサンプリングされた指数を用いる点にある：
+\begin{equation}
+  s_k = f_k^{-\beta_i / 2}
+  \label{eq:scaling}
+\end{equation}
+これは標準的なピンクノイズで用いられる固定値$s_k = f_k^{-1/2}$を一般化したものである．
+
+生成された単位分散のノイズは，センサ由来の観測（関節角度・関節角速度）にのみ選択的に注入し，
+指令値や前ステップアクションにはノイズを付加しない：
+\begin{equation}
+  \tilde{\boldsymbol{o}}_t^{(\mathrm{sens})} = \boldsymbol{o}_t^{(\mathrm{sens})} + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(\beta_i)}
+  \label{eq:corruption}
+\end{equation}
+ここで$\boldsymbol{\eta}_t^{(\beta_i)}$は指数$\beta_i$で生成された色付きノイズサンプルである．
+
+\subsubsection{比較条件}
+
+$\beta$ランダマイゼーションの効果を検証するため，
+既存のベースラインに加えて以下の比較条件を設定した．
+
+\begin{table}[htbp]
+  \centering
+  \caption{ノイズ注入条件の比較}
+  \label{tab:colored_scenarios}
+  \begin{tabular}{lccc}
+    \toprule
+    条件名 & アクションノイズ & 観測ノイズ & $\beta$ \\
+    \midrule
+    No-Noise（ベースライン） & -- & -- & -- \\
+    Obs-Noise（ピンク） & -- & ピンク & $1$（固定） \\
+    \textbf{Obs-Colored-Noise（提案手法）} & -- & \textbf{色付き} & $\boldsymbol{\mathcal{U}(0.5, 1.5)}$ \\
+    Both-Colored-Noise & ピンク & 色付き & アクション: $1$，観測: $\mathcal{U}(0.5, 1.5)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{ハイパーパラメータ}
+
+\begin{table}[htbp]
+  \centering
+  \caption{色付き観測ノイズのハイパーパラメータ}
+  \label{tab:colored_hyperparams}
+  \begin{tabular}{lll}
+    \toprule
+    パラメータ & 記号 & 値 \\
+    \midrule
+    スペクトル指数の範囲 & $[\beta_{\min},\, \beta_{\max}]$ & $[0.5,\, 1.5]$ \\
+    観測ノイズスケール & $\sigma_{\mathrm{obs}}$ & $0.02$ \\
+    ノイズバッファ長 & $T$ & $1000$ ステップ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+$\beta \in [0.5, 1.5]$の範囲は，
+弱い相関を持つほぼ白色のノイズ（$\beta = 0.5$）から
+強い時間相関を持つノイズ（$\beta = 1.5$，ブラウンノイズに近い）までをカバーし，
+実機センサの多様な特性を網羅する設定となっている．
+
+% =====================================================================
+% 参考文献（.bib ファイルに追加してください）
+% =====================================================================
+% @inproceedings{eberhard2023pink,
+%   title     = {Pink Noise Is All You Need: Colored Noise Exploration in Deep Reinforcement Learning},
+%   author    = {Eberhard, Onno and Hollenstein, Jakob and Pinneri, Cristina and Martius, Georg},
+%   booktitle = {Proceedings of the Eleventh International Conference on Learning Representations (ICLR 2023)},
+%   year      = {2023},
+%   url       = {https://openreview.net/forum?id=hQ9V5QN27eS},
+% }
+% @article{timmer1995,
+%   title   = {On generating power law noise},
+%   author  = {Timmer, J. and Koenig, M.},
+%   journal = {Astronomy and Astrophysics},
+%   volume  = {300},
+%   pages   = {707--710},
+%   year    = {1995},
+% }

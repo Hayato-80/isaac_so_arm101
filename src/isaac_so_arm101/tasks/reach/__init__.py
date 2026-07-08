@@ -264,3 +264,45 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+# Colored noise (randomized beta) comparison environments
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Obs-Colored-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealObsColoredNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Both-Colored-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealBothColoredNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Obs-Colored-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealObsColoredNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Both-Colored-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_pink_noise_comparison_env_cfg:SoArm101ReachSim2RealBothColoredNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+

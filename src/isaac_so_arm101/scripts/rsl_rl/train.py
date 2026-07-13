@@ -22,6 +22,7 @@ parser.add_argument("--video_length", type=int, default=200, help="Length of the
 parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--visualize_noise", action="store_true", default=False, help="Visualize the generated observation noise during training.")
 parser.add_argument(
     "--agent", type=str, default="rsl_rl_cfg_entry_point", help="Name of the RL agent configuration entry point."
 )
@@ -40,6 +41,11 @@ args_cli, hydra_args = parser.parse_known_args()
 # always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
+
+# set environment variable for noise visualization
+if args_cli.visualize_noise:
+    import os
+    os.environ["VISUALIZE_NOISE"] = "1"
 
 # clear out sys.argv for Hydra
 sys.argv = [sys.argv[0]] + hydra_args

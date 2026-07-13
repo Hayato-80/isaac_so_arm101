@@ -296,3 +296,235 @@ class SoArm101ReachSim2RealBothColoredNoiseCfg_PLAY(SoArm101ReachSim2RealBothCol
         self.events.action_pink_noise.enable = False
         self.events.reset_action_pink_noise.enable = False
 
+
+##
+# Fixed Beta Colored Noise Scenarios on Observations Only
+##
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta025Cfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario with fixed Beta=0.25 colored noise applied to observations only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=0.25,
+            beta_max=0.25,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=0.25,
+                beta_max=0.25,
+            ),
+        )
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta050Cfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario with fixed Beta=0.50 colored noise applied to observations only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=0.5,
+            beta_max=0.5,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=0.5,
+                beta_max=0.5,
+            ),
+        )
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta075Cfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario with fixed Beta=0.75 colored noise applied to observations only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=0.75,
+            beta_max=0.75,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=0.75,
+                beta_max=0.75,
+            ),
+        )
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta100Cfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario with fixed Beta=1.00 colored noise applied to observations only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=1.0,
+            beta_max=1.0,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=1.0,
+                beta_max=1.0,
+            ),
+        )
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta125Cfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario with fixed Beta=1.25 colored noise applied to observations only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=1.25,
+            beta_max=1.25,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=1.25,
+                beta_max=1.25,
+            ),
+        )
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta150Cfg(SoArm101ReachPinkNoiseBaseCfg):
+    """Scenario with fixed Beta=1.50 colored noise applied to observations only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.enable_corruption = True
+        colored_cfg = sim2real_randomization.ColoredNoiseObservationModelCfg(
+            std=0.02,
+            beta_min=1.5,
+            beta_max=1.5,
+        )
+        self.observations.policy.joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=colored_cfg,
+        )
+        self.observations.policy.joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=sim2real_randomization.ColoredNoiseObservationModelCfg(
+                std=0.02,
+                beta_min=1.5,
+                beta_max=1.5,
+            ),
+        )
+
+
+##
+# PLAY variants for fixed Beta scenarios
+##
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta025Cfg_PLAY(SoArm101ReachSim2RealObsBeta025Cfg):
+    """Play variant for fixed Beta=0.25."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta050Cfg_PLAY(SoArm101ReachSim2RealObsBeta050Cfg):
+    """Play variant for fixed Beta=0.50."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta075Cfg_PLAY(SoArm101ReachSim2RealObsBeta075Cfg):
+    """Play variant for fixed Beta=0.75."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta100Cfg_PLAY(SoArm101ReachSim2RealObsBeta100Cfg):
+    """Play variant for fixed Beta=1.00."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta125Cfg_PLAY(SoArm101ReachSim2RealObsBeta125Cfg):
+    """Play variant for fixed Beta=1.25."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class SoArm101ReachSim2RealObsBeta150Cfg_PLAY(SoArm101ReachSim2RealObsBeta150Cfg):
+    """Play variant for fixed Beta=1.50."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 10
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+

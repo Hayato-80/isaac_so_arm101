@@ -255,7 +255,10 @@ class TorchColoredNoiseProcess:
         seq_len = self.size[2] if len(self.size) > 2 else self.size[-1]
         slices = []
         for _ in range(num_envs):
-            beta = torch.empty(1).uniform_(self.beta_min, self.beta_max).item()
+            if self.beta_min == self.beta_max:
+                beta = self.beta_min
+            else:
+                beta = torch.empty(1).uniform_(self.beta_min, self.beta_max).item()
             single_size = [1, obs_dim, seq_len] if len(self.size) > 2 else [obs_dim, seq_len]
             slices.append(generate_colored_noise(single_size, self.device, self.dtype, exponent=beta))
         self.buffer = torch.cat(slices, dim=0)
@@ -268,7 +271,10 @@ class TorchColoredNoiseProcess:
         obs_dim = self.size[1]
         seq_len = self.size[2] if len(self.size) > 2 else self.size[-1]
         for i in env_ids:
-            beta = torch.empty(1).uniform_(self.beta_min, self.beta_max).item()
+            if self.beta_min == self.beta_max:
+                beta = self.beta_min
+            else:
+                beta = torch.empty(1).uniform_(self.beta_min, self.beta_max).item()
             single_size = [1, obs_dim, seq_len] if len(self.size) > 2 else [obs_dim, seq_len]
             new_noise = generate_colored_noise(single_size, self.device, self.dtype, exponent=beta)
             self.buffer[i] = new_noise.squeeze(0) if len(self.size) > 2 else new_noise
@@ -366,9 +372,43 @@ class PinkNoiseObservationModel(noise_utils.NoiseModel):
                 dtype=data.dtype,
                 scale=self._std
             )
+            # Initialize visualization state
+            self._noise_history = []
+            self._step_count = 0
 
         # Sample 1 step of noise
         noise_torch = self._process.sample(T=1)
+
+        # Visualization hook for environment 0
+        if data.shape[0] > 0 and os.getenv("VISUALIZE_NOISE") == "1":
+            self._noise_history.append(noise_torch[0, 0].item())
+            self._step_count += 1
+            if self._step_count % 1000 == 0:
+                try:
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    import matplotlib.pyplot as plt
+                    import wandb
+                    
+                    fig, ax = plt.subplots(figsize=(10, 4))
+                    ax.plot(self._noise_history)
+                    ax.set_title(f"Pink Noise Trajectory (env 0, dim 0) - beta = 1.0")
+                    ax.set_xlabel("Steps")
+                    ax.set_ylabel("Noise Value")
+                    ax.grid(True, alpha=0.3)
+                    
+                    os.makedirs("logs/noise_viz", exist_ok=True)
+                    filepath = f"logs/noise_viz/pink_noise_plot_{self._step_count}.png"
+                    plt.savefig(filepath, dpi=150)
+                    
+                    if wandb.run is not None:
+                        wandb.log({"Observation Noise/Trajectory": wandb.Image(filepath)}, step=self._step_count)
+                        
+                    plt.close(fig)
+                except Exception as e:
+                    print(f"Failed to visualize noise: {e}")
+                finally:
+                    self._noise_history = []
 
         if data.dim() == 1:
             noise_torch = noise_torch.squeeze(-1)
@@ -424,9 +464,43 @@ class ColoredNoiseObservationModel(noise_utils.NoiseModel):
                 beta_min=self._beta_min,
                 beta_max=self._beta_max,
             )
+            # Initialize visualization state
+            self._noise_history = []
+            self._step_count = 0
 
         # Sample 1 step of noise
         noise_torch = self._process.sample(T=1)
+
+        # Visualization hook for environment 0
+        if data.shape[0] > 0 and os.getenv("VISUALIZE_NOISE") == "1":
+            self._noise_history.append(noise_torch[0, 0].item())
+            self._step_count += 1
+            if self._step_count % 1000 == 0:
+                try:
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    import matplotlib.pyplot as plt
+                    import wandb
+                    
+                    fig, ax = plt.subplots(figsize=(10, 4))
+                    ax.plot(self._noise_history)
+                    ax.set_title(f"Colored Noise Trajectory (env 0, dim 0) - beta in [{self._beta_min}, {self._beta_max}]")
+                    ax.set_xlabel("Steps")
+                    ax.set_ylabel("Noise Value")
+                    ax.grid(True, alpha=0.3)
+                    
+                    os.makedirs("logs/noise_viz", exist_ok=True)
+                    filepath = f"logs/noise_viz/colored_noise_plot_{self._step_count}.png"
+                    plt.savefig(filepath, dpi=150)
+                    
+                    if wandb.run is not None:
+                        wandb.log({"Observation Noise/Trajectory": wandb.Image(filepath)}, step=self._step_count)
+                        
+                    plt.close(fig)
+                except Exception as e:
+                    print(f"Failed to visualize noise: {e}")
+                finally:
+                    self._noise_history = []
 
         if data.dim() == 1:
             noise_torch = noise_torch.squeeze(-1)

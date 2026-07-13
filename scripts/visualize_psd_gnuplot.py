@@ -85,11 +85,11 @@ set key bottom left spacing 1.5 font "Times New Roman, 12"
 # Set decent ranges
 set yrange [1e-5:1e4]
 
-plot "noise_plot/psd_data.dat" using 1:2 title "White Noise ({/Symbol b}=0.0)" with lines lc rgb "#333333" lw 2, \\
-     "noise_plot/psd_data.dat" using 1:3 title "Colored Noise ({/Symbol b}=0.5)" with lines lc rgb "#228B22" lw 2, \\
-     "noise_plot/psd_data.dat" using 1:4 title "Pink Noise ({/Symbol b}=1.0)" with lines lc rgb "#8A2BE2" lw 2, \\
-     "noise_plot/psd_data.dat" using 1:5 title "Colored Noise ({/Symbol b}=1.5)" with lines lc rgb "#FF8C00" lw 2, \\
-     "noise_plot/psd_data.dat" using 1:6 title "Brown Noise ({/Symbol b}=2.0)" with lines lc rgb "#DC143C" lw 2
+plot "noise_plot/psd_data.dat" using 1:2 title "White Noise ({/:Italic β}=0.0)" with lines lc rgb "#333333" lw 2, \\
+     "noise_plot/psd_data.dat" using 1:3 title "Colored Noise ({/:Italic β}=0.5)" with lines lc rgb "#228B22" lw 2, \\
+     "noise_plot/psd_data.dat" using 1:4 title "Pink Noise ({/:Italic β}=1.0)" with lines lc rgb "#8A2BE2" lw 2, \\
+     "noise_plot/psd_data.dat" using 1:5 title "Colored Noise ({/:Italic β}=1.5)" with lines lc rgb "#FF8C00" lw 2, \\
+     "noise_plot/psd_data.dat" using 1:6 title "Brown Noise ({/:Italic β}=2.0)" with lines lc rgb "#DC143C" lw 2
 """
 
     plt_file = "noise_plot/plot_psd.plt"

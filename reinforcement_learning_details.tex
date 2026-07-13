@@ -1,0 +1,148 @@
+% =====================================================================
+% Reinforcement Learning Configuration, Reward Functions, and Parameters
+% for SO-ARM101 Reach Sim-to-Real Environments
+% =====================================================================
+
+\section{Reinforcement Learning Details}
+\label{sec:rl_details}
+
+We formulate the end-effector reach task as a Markov Decision Process (MDP) and train policies using Proximal Policy Optimization (PPO) \cite{schulman2017proximal}. 
+
+\subsection{State and Action Spaces}
+The agent controls the joint positions of the 6-DOF SO-ARM101 robot arm. The action space $\mathcal{A} \subset \mathbb{R}^6$ represents normalized joint position targets. The policy runs at a frequency of 30\,Hz (simulation time step $dt = 1/60$\,s with a decimation factor of 2).
+
+The observation space $\mathcal{O} \subset \mathbb{R}^{25}$ is 25-dimensional and consists of the components detailed in Table~\ref{tab:observation_space}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Observation Space Structure (25D)}
+  \label{tab:observation_space}
+  \begin{tabular}{lll}
+    \toprule
+    Component & Description & Dimension \\
+    \midrule
+    Joint positions ($\boldsymbol{q}_t$) & Relative joint angles of the 6 joints & 6D \\
+    Joint velocities ($\dot{\boldsymbol{q}}_t$) & Relative joint velocities & 6D \\
+    Target EE command ($\boldsymbol{g}_t$) & 3D position + 4D quaternion target orientation & 7D \\
+    Previous action ($\boldsymbol{a}_{t-1}$) & Joint commands from the last control step & 6D \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Reward Functions}
+The reward function is designed to guide the robot's end-effector toward the target pose while regularizing movements to ensure smooth and hardware-safe trajectories. The components are detailed below and summarized in Table~\ref{tab:reward_functions}.
+
+\begin{enumerate}
+    \item \textbf{End-Effector Position Tracking}: Standard L2 distance penalty encouraging the end-effector pose $\boldsymbol{p}_{\mathrm{ee}}$ to approach the target pose $\boldsymbol{p}_{\mathrm{target}}$:
+    \begin{equation}
+        R_{\mathrm{pos}} = - \|\boldsymbol{p}_{\mathrm{ee}} - \boldsymbol{p}_{\mathrm{target}}\|_2
+    \end{equation}
+
+    \item \textbf{Fine-Grained Position Tracking}: A hyperbolic tangent penalty providing high-gradient incentive when the end-effector is close to the goal:
+    \begin{equation}
+        R_{\mathrm{fine\_pos}} = \tanh\left(-\frac{\|\boldsymbol{p}_{\mathrm{ee}} - \boldsymbol{p}_{\mathrm{target}}\|_2}{\sigma_{\mathrm{fine}}}\right)
+    \end{equation}
+    where $\sigma_{\mathrm{fine}} = 0.1$\,m.
+
+    \item \textbf{End-Effector Orientation Tracking}: An angular command error penalty:
+    \begin{equation}
+        R_{\mathrm{ori}} = - \theta_{\mathrm{error}}
+    \end{equation}
+    where $\theta_{\mathrm{error}}$ is the rotation angle (in radians) of the quaternion error between the current gripper orientation and target orientation.
+
+    \item \textbf{Action Rate Penalty}: Restricts abrupt changes in joint commands to improve trajectory smoothness:
+    \begin{equation}
+        R_{\mathrm{act\_rate}} = - \|\boldsymbol{a}_t - \boldsymbol{a}_{t-1}\|_2^2
+    \end{equation}
+
+    \item \textbf{Joint Velocity Penalty}: Minimizes excessive joint velocity to limit motor strain:
+    \begin{equation}
+        R_{\mathrm{joint\_vel}} = - \|\dot{\boldsymbol{q}}_t\|_2^2
+    \end{equation}
+\end{enumerate}
+
+\begin{table}[htbp]
+  \centering
+  \caption{MDP Reward Term Configurations}
+  \label{tab:reward_functions}
+  \begin{tabular}{llcl}
+    \toprule
+    Reward Term & Formula & Initial Weight & Notes / Curriculum \\
+    \midrule
+    $R_{\mathrm{pos}}$ & $-\|\boldsymbol{p}_{\mathrm{ee}} - \boldsymbol{p}_{\mathrm{target}}\|_2$ & $-0.2$ & None \\
+    $R_{\mathrm{fine\_pos}}$ & $\tanh(-\|\boldsymbol{p}_{\mathrm{ee}} - \boldsymbol{p}_{\mathrm{target}}\|_2 / 0.1)$ & $0.1$ & None \\
+    $R_{\mathrm{ori}}$ & $-\theta_{\mathrm{error}}$ & $-0.1$ & None \\
+    $R_{\mathrm{act\_rate}}$ & $-\|\boldsymbol{a}_t - \boldsymbol{a}_{t-1}\|_2^2$ & $-0.0001$ & Decreased to $-0.005$ over 4500 steps \\
+    $R_{\mathrm{joint\_vel}}$ & $-\|\dot{\boldsymbol{q}}_t\|_2^2$ & $-0.0001$ & Decreased to $-0.001$ over 4500 steps \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{PPO Hyperparameters}
+The policies are parameterized by Multi-Layer Perceptrons (MLPs) and trained using PyTorch via the RSL-RL framework. The optimization hyperparameters are summarized in Table~\ref{tab:ppo_hyperparams}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{PPO Agent Training Hyperparameters}
+  \label{tab:ppo_hyperparams}
+  \begin{tabular}{lc}
+    \toprule
+    Hyperparameter & Value \\
+    \midrule
+    Actor network architecture & MLP: $[64, 64]$ hidden units \\
+    Critic network architecture & MLP: $[64, 64]$ hidden units \\
+    Hidden activation function & ELU \\
+    Initial noise scale ($\sigma_{\mathrm{init\_noise}}$) & $1.0$ \\
+    Number of parallel environments & $4096$ \\
+    Rollout horizon per environment ($N$) & $24$ steps \\
+    Discount factor ($\gamma$) & $0.99$ \\
+    GAE parameter ($\lambda$) & $0.95$ \\
+    Number of learning epochs per iteration & $8$ \\
+    Number of mini-batches per epoch & $4$ \\
+    Learning rate ($\alpha$) & $1.0 \times 10^{-3}$ \\
+    Learning rate schedule & Adaptive KL scheduler (target KL = 0.01) \\
+    Max gradient norm limit & $1.0$ \\
+    Maximum training iterations & $1000$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Noise and Domain Randomization Scenarios}
+To investigate policy robustness against sensor non-idealities, we corrupt the joint position and joint velocity observations during training under three distinct observation noise scenarios:
+
+\begin{enumerate}
+    \item \textbf{No-Noise Baseline} (\texttt{Isaac-SO-ARM101-Reach-Sim2Real-Obs-No-Noise-v0}): \\
+    Training observations are clean and uncorrupted by temporal noise.
+
+    \item \textbf{Fixed Spectral Exponent Noise} (\texttt{Isaac-SO-ARM101-Reach-Sim2Real-Obs-Beta***-v0}): \\
+    Observation signals $\boldsymbol{o}_t^{(\mathrm{sens})}$ are corrupted by colored noise $\boldsymbol{\eta}_t^{(\beta)}$ with a fixed spectral exponent $\beta \in \{0.25, 0.50, 0.75, 1.00, 1.25, 1.50\}$:
+    \begin{equation}
+        \tilde{\boldsymbol{o}}_t^{(\mathrm{sens})} = \boldsymbol{o}_t^{(\mathrm{sens})} + \sigma_{\mathrm{obs}} \, \boldsymbol{\eta}_t^{(\beta)}
+    \end{equation}
+    where $\sigma_{\mathrm{obs}} = 0.02$, and $\boldsymbol{\eta}_t^{(\beta)}$ is a stationary colored noise process with Power Spectral Density (PSD) matching $S(f) \propto 1/f^{\beta}$ generated via the Timmer-Koenig FFT algorithm.
+
+    \item \textbf{Spectral Exponent Randomization} (\texttt{Isaac-SO-ARM101-Reach-Sim2Real-Obs-Colored-Noise-v0}): \\
+    At the start of each episode reset, each parallel environment $i$ independently samples a random spectral exponent $\beta_i \sim \mathcal{U}(0.5, 1.5)$. Observation noise is generated using the sampled exponent, ensuring the policy experiences a diverse spectrum of temporal correlations.
+\end{enumerate}
+
+These environments are summarized in Table~\ref{tab:noise_scenarios}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Observation Noise Environments Comparison}
+  \label{tab:noise_scenarios}
+  \begin{tabular}{lccc}
+    \toprule
+    Environment Name & Obs Noise Inject & Exponent Parameter $\beta$ & Noise Scale $\sigma_{\mathrm{obs}}$ \\
+    \midrule
+    \texttt{Obs-No-Noise-v0} & No & -- & -- \\
+    \texttt{Obs-Beta0.25-v0} & Yes & $0.25$ (fixed) & $0.02$ \\
+    \texttt{Obs-Beta0.5-v0} & Yes & $0.50$ (fixed) & $0.02$ \\
+    \texttt{Obs-Beta0.75-v0} & Yes & $0.75$ (fixed) & $0.02$ \\
+    \texttt{Obs-Beta1.0-v0} & Yes & $1.00$ (fixed) & $0.02$ \\
+    \texttt{Obs-Beta1.25-v0} & Yes & $1.25$ (fixed) & $0.02$ \\
+    \texttt{Obs-Beta1.5-v0} & Yes & $1.50$ (fixed) & $0.02$ \\
+    \texttt{Obs-Colored-Noise-v0} & Yes & $\boldsymbol{\mathcal{U}(0.5, 1.5)}$ (randomized) & $0.02$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}

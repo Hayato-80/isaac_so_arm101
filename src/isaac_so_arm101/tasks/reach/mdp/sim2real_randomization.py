@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import os
 import torch
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass, noise as noise_utils
@@ -388,7 +389,6 @@ class PinkNoiseObservationModel(noise_utils.NoiseModel):
                     import matplotlib
                     matplotlib.use('Agg')
                     import matplotlib.pyplot as plt
-                    import wandb
                     
                     fig, ax = plt.subplots(figsize=(10, 4))
                     ax.plot(self._noise_history)
@@ -397,12 +397,17 @@ class PinkNoiseObservationModel(noise_utils.NoiseModel):
                     ax.set_ylabel("Noise Value")
                     ax.grid(True, alpha=0.3)
                     
-                    os.makedirs("logs/noise_viz", exist_ok=True)
-                    filepath = f"logs/noise_viz/pink_noise_plot_{self._step_count}.png"
+                    viz_dir = os.environ.get("NOISE_VIZ_DIR", "logs/noise_viz")
+                    os.makedirs(viz_dir, exist_ok=True)
+                    filepath = os.path.join(viz_dir, f"pink_noise_plot_{self._step_count}.png")
                     plt.savefig(filepath, dpi=150)
                     
-                    if wandb.run is not None:
-                        wandb.log({"Observation Noise/Trajectory": wandb.Image(filepath)}, step=self._step_count)
+                    try:
+                        import wandb
+                        if wandb.run is not None:
+                            wandb.log({"Observation Noise/Trajectory": wandb.Image(filepath)}, step=self._step_count)
+                    except ImportError:
+                        pass
                         
                     plt.close(fig)
                 except Exception as e:
@@ -480,7 +485,6 @@ class ColoredNoiseObservationModel(noise_utils.NoiseModel):
                     import matplotlib
                     matplotlib.use('Agg')
                     import matplotlib.pyplot as plt
-                    import wandb
                     
                     fig, ax = plt.subplots(figsize=(10, 4))
                     ax.plot(self._noise_history)
@@ -489,12 +493,17 @@ class ColoredNoiseObservationModel(noise_utils.NoiseModel):
                     ax.set_ylabel("Noise Value")
                     ax.grid(True, alpha=0.3)
                     
-                    os.makedirs("logs/noise_viz", exist_ok=True)
-                    filepath = f"logs/noise_viz/colored_noise_plot_{self._step_count}.png"
+                    viz_dir = os.environ.get("NOISE_VIZ_DIR", "logs/noise_viz")
+                    os.makedirs(viz_dir, exist_ok=True)
+                    filepath = os.path.join(viz_dir, f"colored_noise_plot_{self._step_count}.png")
                     plt.savefig(filepath, dpi=150)
                     
-                    if wandb.run is not None:
-                        wandb.log({"Observation Noise/Trajectory": wandb.Image(filepath)}, step=self._step_count)
+                    try:
+                        import wandb
+                        if wandb.run is not None:
+                            wandb.log({"Observation Noise/Trajectory": wandb.Image(filepath)}, step=self._step_count)
+                    except ImportError:
+                        pass
                         
                     plt.close(fig)
                 except Exception as e:

@@ -429,4 +429,64 @@ gym.register(
     disable_env_checker=True,
 )
 
+# Command Colored Noise Environments
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Cmd-Colored-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_command_noise_env_cfg:SoArm101ReachSim2RealCmdColoredNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
 
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Cmd-Colored-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_command_noise_env_cfg:SoArm101ReachSim2RealCmdColoredNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Cmd-Both-Colored-Noise-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_command_noise_env_cfg:SoArm101ReachSim2RealCmdBothColoredNoiseCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-SO-ARM101-Reach-Sim2Real-Cmd-Both-Colored-Noise-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.sim2real_command_noise_env_cfg:SoArm101ReachSim2RealCmdBothColoredNoiseCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+    },
+    disable_env_checker=True,
+)
+
+for beta in ["050", "075", "100", "125", "150"]:
+    gym.register(
+        id=f"Isaac-SO-ARM101-Reach-Sim2Real-Cmd-Beta{beta}-v0",
+        entry_point="isaaclab.envs:ManagerBasedRLEnv",
+        kwargs={
+            "env_cfg_entry_point": f"{__name__}.sim2real_command_noise_env_cfg:SoArm101ReachSim2RealCmdBeta{beta}Cfg",
+            "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+        },
+        disable_env_checker=True,
+    )
+    
+    gym.register(
+        id=f"Isaac-SO-ARM101-Reach-Sim2Real-Cmd-Beta{beta}-Play-v0",
+        entry_point="isaaclab.envs:ManagerBasedRLEnv",
+        kwargs={
+            "env_cfg_entry_point": f"{__name__}.sim2real_command_noise_env_cfg:SoArm101ReachSim2RealCmdBeta{beta}Cfg_PLAY",
+            "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:ReachPPORunnerCfg",
+        },
+        disable_env_checker=True,
+    )

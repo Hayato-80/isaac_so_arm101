@@ -87,9 +87,9 @@ set yrange [1e-5:1e4]
 
 plot "noise_plot/psd_data.dat" using 1:2 title "White Noise ({/:Italic β}=0.0)" with lines lc rgb "#333333" lw 2, \\
      "noise_plot/psd_data.dat" using 1:3 title "Colored Noise ({/:Italic β}=0.5)" with lines lc rgb "#228B22" lw 2, \\
-     "noise_plot/psd_data.dat" using 1:4 title "Pink Noise ({/:Italic β}=1.0)" with lines lc rgb "#8A2BE2" lw 2, \\
+     "noise_plot/psd_data.dat" using 1:4 title "Pink Noise ({/:Italic β}=1.0)" with lines lc rgb "#FF00FF" lw 2, \\
      "noise_plot/psd_data.dat" using 1:5 title "Colored Noise ({/:Italic β}=1.5)" with lines lc rgb "#FF8C00" lw 2, \\
-     "noise_plot/psd_data.dat" using 1:6 title "Brown Noise ({/:Italic β}=2.0)" with lines lc rgb "#DC143C" lw 2
+     "noise_plot/psd_data.dat" using 1:6 title "Red Noise ({/:Italic β}=2.0)" with lines lc rgb "#DC143C" lw 2
 """
 
     plt_file = "noise_plot/plot_psd.plt"

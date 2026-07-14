@@ -72,14 +72,14 @@ set title "Colored Noise ({/:Italic β}=0.5)"
 plot "noise_plot/noise_data.dat" using 1:3 with lines lc rgb "#228B22" lw 1.2
 
 set title "Pink Noise ({/:Italic β}=1.0)"
-plot "noise_plot/noise_data.dat" using 1:4 with lines lc rgb "#8A2BE2" lw 1.2
+plot "noise_plot/noise_data.dat" using 1:4 with lines lc rgb "#FF00FF" lw 1.2
 
 set title "Colored Noise ({/:Italic β}=1.5)"
 plot "noise_plot/noise_data.dat" using 1:5 with lines lc rgb "#FF8C00" lw 1.2
 
 set format x "%g"
 set xlabel "Time Step" font "Times New Roman,12"
-set title "Brown/Red Noise ({/:Italic β}=2.0)"
+set title "Red Noise ({/:Italic β}=2.0)"
 plot "noise_plot/noise_data.dat" using 1:6 with lines lc rgb "#DC143C" lw 1.2
 
 unset multiplot
